@@ -1,0 +1,2399 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="color-scheme" content="dark">
+  <title>Quant Terminal</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@600;700;800&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+  <style>
+    :root {
+      --bg: #050914;
+      --surface: rgba(10,16,30,0.78);
+      --surface-2: rgba(15,22,40,0.88);
+      --border: rgba(0,212,255,0.08);
+      --accent: #00d4ff;
+      --green: #00e676;
+      --red: #ff3d6b;
+      --yellow: #ffd166;
+      --text: #c8d8e8;
+      --text-dim: #5a7a96;
+      --shadow-soft: 0 20px 70px rgba(0,0,0,0.24);
+      --sidebar-width: 280px;
+      --topbar-height: 64px;
+      --radius: 4px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      min-height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: "Space Mono", monospace;
+      font-feature-settings: "tnum" 1, "liga" 0;
+      text-rendering: geometricPrecision;
+    }
+
+    body {
+      min-height: 100vh;
+      margin: 0;
+      overflow-x: hidden;
+      background:
+        radial-gradient(circle at 18% 8%, rgba(0,212,255,0.07), transparent 28%),
+        radial-gradient(circle at 78% 0%, rgba(0,230,118,0.035), transparent 30%),
+        linear-gradient(135deg, #050914 0%, #060b17 42%, #050914 100%);
+    }
+
+    body::before {
+      position: fixed;
+      inset: 0;
+      z-index: 4;
+      content: "";
+      pointer-events: none;
+      background: repeating-linear-gradient(
+        0deg,
+        rgba(255,255,255,0.018) 0,
+        rgba(255,255,255,0.018) 1px,
+        transparent 1px,
+        transparent 5px
+      );
+      opacity: 0.14;
+      mix-blend-mode: screen;
+    }
+
+    body::after {
+      position: fixed;
+      inset: auto -20% -32% -20%;
+      height: 54vh;
+      content: "";
+      pointer-events: none;
+      background: radial-gradient(ellipse at center, rgba(0,212,255,0.055), transparent 62%);
+      filter: blur(28px);
+      animation: ambientDrift 24s ease-in-out infinite alternate;
+    }
+
+    @keyframes ambientDrift {
+      from { transform: translate3d(-1.4%, 0, 0); opacity: 0.54; }
+      to { transform: translate3d(1.4%, -1%, 0); opacity: 0.82; }
+    }
+
+    button,
+    select,
+    input {
+      color: inherit;
+      font: inherit;
+    }
+
+    button {
+      cursor: pointer;
+    }
+
+    button:focus-visible,
+    select:focus-visible,
+    [tabindex]:focus-visible {
+      outline: 1px solid var(--accent);
+      outline-offset: 2px;
+      box-shadow: 0 0 0 3px rgba(0,212,255,0.12);
+    }
+
+    .terminal-shell {
+      min-height: 100vh;
+    }
+
+    .sidebar {
+      position: fixed;
+      top: 0;
+      bottom: 0;
+      left: 0;
+      z-index: 10;
+      display: flex;
+      width: var(--sidebar-width);
+      flex-direction: column;
+      border-right: 1px solid var(--border);
+      background: var(--surface);
+      backdrop-filter: blur(20px);
+      box-shadow: var(--shadow-soft);
+    }
+
+    .brand {
+      padding: 24px 24px 20px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .brand-title {
+      margin: 0;
+      font-family: "Syne", sans-serif;
+      font-size: 22px;
+      font-weight: 800;
+      line-height: 0.95;
+      letter-spacing: 1.8px;
+      color: var(--text);
+    }
+
+    .brand-title span {
+      color: var(--accent);
+    }
+
+    .brand-meta {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      margin-top: 12px;
+      color: var(--text-dim);
+      font-size: 10px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+    }
+
+    .status-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--text-dim);
+      box-shadow: 0 0 0 4px rgba(90,122,150,0.09);
+    }
+
+    .status-dot.is-live,
+    .status-dot.is-open,
+    .status-dot.is-ok,
+    .status-dot.is-buy,
+    .status-dot.is-green {
+      background: var(--green);
+      box-shadow: 0 0 0 4px rgba(0,230,118,0.08);
+    }
+
+    .status-dot.is-paper,
+    .status-dot.is-warn,
+    .status-dot.is-hold,
+    .status-dot.is-yellow {
+      background: var(--yellow);
+      box-shadow: 0 0 0 4px rgba(255,209,102,0.08);
+    }
+
+    .status-dot.is-error,
+    .status-dot.is-closed,
+    .status-dot.is-sell,
+    .status-dot.is-red {
+      background: var(--red);
+      box-shadow: 0 0 0 4px rgba(255,61,107,0.08);
+    }
+
+    .nav {
+      display: grid;
+      gap: 4px;
+      padding: 18px 12px;
+    }
+
+    .nav-button {
+      display: grid;
+      grid-template-columns: 26px minmax(0, 1fr);
+      gap: 10px;
+      align-items: center;
+      width: 100%;
+      min-height: 42px;
+      padding: 0 12px;
+      border: 1px solid transparent;
+      border-radius: var(--radius);
+      color: var(--text-dim);
+      background: transparent;
+      font-size: 11px;
+      letter-spacing: 1.6px;
+      text-align: left;
+      text-transform: uppercase;
+      transition: border-color 160ms ease, background 160ms ease, color 160ms ease, transform 160ms ease;
+    }
+
+    .nav-button:hover {
+      color: var(--text);
+      background: rgba(255,255,255,0.025);
+      border-color: rgba(0,212,255,0.06);
+    }
+
+    .nav-button[aria-selected="true"] {
+      color: var(--accent);
+      background: rgba(0,212,255,0.055);
+      border-color: rgba(0,212,255,0.11);
+    }
+
+    .nav-index {
+      color: currentColor;
+      opacity: 0.72;
+      font-size: 10px;
+    }
+
+    .sidebar-telemetry {
+      display: grid;
+      gap: 16px;
+      margin-top: auto;
+      padding: 18px 20px 22px;
+      border-top: 1px solid var(--border);
+    }
+
+    .telemetry-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+    }
+
+    .telemetry-cell {
+      min-height: 54px;
+      padding: 9px 10px;
+      border: 1px solid rgba(0,212,255,0.055);
+      border-radius: var(--radius);
+      background: rgba(15,22,40,0.45);
+    }
+
+    .label {
+      display: block;
+      color: var(--text-dim);
+      font-size: 9px;
+      line-height: 1.3;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+    }
+
+    .value {
+      display: block;
+      margin-top: 5px;
+      color: var(--text);
+      font-size: 13px;
+      line-height: 1.2;
+    }
+
+    .risk-rail {
+      width: 100%;
+      height: 6px;
+      overflow: hidden;
+      border: 1px solid rgba(0,212,255,0.06);
+      border-radius: var(--radius);
+      background: rgba(5,9,20,0.84);
+    }
+
+    .risk-fill {
+      width: 0;
+      height: 100%;
+      background: linear-gradient(90deg, rgba(0,212,255,0.2), var(--accent));
+      transition: width 320ms ease, background 320ms ease;
+    }
+
+    .topbar {
+      position: fixed;
+      top: 0;
+      right: 0;
+      left: var(--sidebar-width);
+      z-index: 9;
+      display: grid;
+      grid-template-columns: repeat(7, minmax(116px, 1fr));
+      min-height: var(--topbar-height);
+      border-bottom: 1px solid var(--border);
+      background: rgba(5,9,20,0.74);
+      backdrop-filter: blur(20px);
+    }
+
+    .topbar-item {
+      display: flex;
+      min-width: 0;
+      flex-direction: column;
+      justify-content: center;
+      padding: 0 16px;
+      border-right: 1px solid rgba(0,212,255,0.055);
+    }
+
+    .topbar-item:last-child {
+      border-right: 0;
+    }
+
+    .topbar-value {
+      overflow: hidden;
+      color: var(--text);
+      font-size: 12px;
+      line-height: 1.3;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+    }
+
+    .workspace {
+      min-height: 100vh;
+      margin-left: var(--sidebar-width);
+      padding: calc(var(--topbar-height) + 16px) 16px 28px;
+    }
+
+    .workspace-inner {
+      display: grid;
+      grid-template-columns: repeat(12, minmax(0, 1fr));
+      gap: 8px;
+      max-width: 1880px;
+      margin: 0 auto;
+    }
+
+    .span-12 { grid-column: span 12; }
+    .span-9 { grid-column: span 9; }
+    .span-8 { grid-column: span 8; }
+    .span-7 { grid-column: span 7; }
+    .span-6 { grid-column: span 6; }
+    .span-5 { grid-column: span 5; }
+    .span-4 { grid-column: span 4; }
+    .span-3 { grid-column: span 3; }
+    .span-2 { grid-column: span 2; }
+
+    .panel,
+    .metric-card,
+    .alert-card,
+    .spotlight-card,
+    .regime-card {
+      border: 1px solid rgba(0,212,255,0.06);
+      border-radius: var(--radius);
+      background: var(--surface);
+      backdrop-filter: blur(20px);
+      box-shadow: 0 16px 42px rgba(0,0,0,0.16);
+    }
+
+    .panel {
+      min-height: 128px;
+      overflow: hidden;
+    }
+
+    .panel-header {
+      display: flex;
+      min-height: 46px;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 13px 14px;
+      border-bottom: 1px solid rgba(0,212,255,0.055);
+    }
+
+    .panel-title {
+      margin: 0;
+      color: var(--text);
+      font-family: "Syne", sans-serif;
+      font-size: 14px;
+      font-weight: 700;
+      letter-spacing: 0.8px;
+    }
+
+    .panel-meta {
+      color: var(--text-dim);
+      font-size: 10px;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+    }
+
+    .panel-body {
+      padding: 14px;
+    }
+
+    .metric-grid {
+      display: grid;
+      grid-column: span 12;
+      grid-template-columns: repeat(6, minmax(0, 1fr));
+      gap: 8px;
+    }
+
+    .metric-card {
+      position: relative;
+      min-height: 106px;
+      padding: 14px;
+      overflow: hidden;
+    }
+
+    .metric-card::before {
+      position: absolute;
+      top: 0;
+      right: 0;
+      left: 0;
+      height: 1px;
+      content: "";
+      background: linear-gradient(90deg, transparent, rgba(0,212,255,0.35), transparent);
+    }
+
+    .metric-value {
+      display: block;
+      margin-top: 12px;
+      color: var(--text);
+      font-size: clamp(20px, 1.75vw, 30px);
+      line-height: 1;
+      letter-spacing: 0;
+      white-space: nowrap;
+    }
+
+    .metric-value.positive,
+    .text-positive {
+      color: var(--green);
+    }
+
+    .metric-value.negative,
+    .text-negative {
+      color: var(--red);
+    }
+
+    .metric-value.neutral,
+    .text-neutral {
+      color: var(--yellow);
+    }
+
+    .metric-foot {
+      margin-top: 10px;
+      color: var(--text-dim);
+      font-size: 10px;
+      line-height: 1.35;
+    }
+
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+      justify-content: flex-end;
+    }
+
+    .select-control {
+      min-width: 136px;
+      height: 34px;
+      padding: 0 30px 0 10px;
+      border: 1px solid rgba(0,212,255,0.08);
+      border-radius: var(--radius);
+      color: var(--text);
+      background: rgba(5,9,20,0.72);
+      font-size: 10px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+
+    .button,
+    .retry-button {
+      min-height: 32px;
+      padding: 0 12px;
+      border: 1px solid rgba(0,212,255,0.11);
+      border-radius: var(--radius);
+      color: var(--accent);
+      background: rgba(0,212,255,0.045);
+      font-size: 10px;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      transition: transform 160ms ease, border-color 160ms ease, background 160ms ease;
+    }
+
+    .button:hover,
+    .retry-button:hover {
+      transform: translateY(-1px);
+      border-color: rgba(0,212,255,0.22);
+      background: rgba(0,212,255,0.075);
+    }
+
+    .table-wrap {
+      overflow: auto;
+      max-height: 520px;
+      border: 1px solid rgba(0,212,255,0.055);
+      border-radius: var(--radius);
+      background: rgba(5,9,20,0.38);
+    }
+
+    table {
+      width: 100%;
+      min-width: 860px;
+      border-collapse: separate;
+      border-spacing: 0;
+      color: var(--text);
+      font-size: 11px;
+    }
+
+    th,
+    td {
+      padding: 10px 12px;
+      border-bottom: 1px solid rgba(0,212,255,0.045);
+      text-align: left;
+      vertical-align: middle;
+      white-space: nowrap;
+    }
+
+    th {
+      position: sticky;
+      top: 0;
+      z-index: 2;
+      color: var(--text-dim);
+      background: rgba(9,15,28,0.96);
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 1.7px;
+      text-transform: uppercase;
+      backdrop-filter: blur(20px);
+    }
+
+    th[data-sort-key] {
+      cursor: pointer;
+      user-select: none;
+    }
+
+    th[data-sort-key]::after {
+      content: "↕";
+      margin-left: 6px;
+      color: rgba(90,122,150,0.62);
+      font-size: 9px;
+    }
+
+    th[aria-sort="ascending"]::after {
+      content: "↑";
+      color: var(--accent);
+    }
+
+    th[aria-sort="descending"]::after {
+      content: "↓";
+      color: var(--accent);
+    }
+
+    tbody tr {
+      transition: background 140ms ease;
+    }
+
+    tbody tr:hover {
+      background: rgba(0,212,255,0.035);
+    }
+
+    .row-buy {
+      background: rgba(0,230,118,0.028);
+    }
+
+    .row-sell {
+      background: rgba(255,61,107,0.032);
+    }
+
+    .row-warn {
+      background: rgba(255,209,102,0.026);
+    }
+
+    .right {
+      text-align: right;
+    }
+
+    .center {
+      text-align: center;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      min-height: 22px;
+      padding: 0 8px;
+      border: 1px solid rgba(0,212,255,0.08);
+      border-radius: var(--radius);
+      color: var(--text);
+      background: rgba(255,255,255,0.018);
+      font-size: 10px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+
+    .badge.buy,
+    .badge.long,
+    .badge.high {
+      border-color: rgba(0,230,118,0.16);
+      color: var(--green);
+      background: rgba(0,230,118,0.045);
+    }
+
+    .badge.sell,
+    .badge.short,
+    .badge.tier-1,
+    .badge.low-risk {
+      border-color: rgba(255,61,107,0.16);
+      color: var(--red);
+      background: rgba(255,61,107,0.045);
+    }
+
+    .badge.hold,
+    .badge.medium,
+    .badge.tier-2 {
+      border-color: rgba(255,209,102,0.18);
+      color: var(--yellow);
+      background: rgba(255,209,102,0.045);
+    }
+
+    .badge.tier-3,
+    .badge.speculative {
+      color: var(--text-dim);
+    }
+
+    .split-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+    }
+
+    .triple-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 8px;
+    }
+
+    .quad-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 8px;
+    }
+
+    .spotlight-grid {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 8px;
+    }
+
+    .spotlight-card,
+    .alert-card,
+    .regime-card {
+      padding: 14px;
+    }
+
+    .spotlight-top,
+    .alert-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .symbol {
+      color: var(--text);
+      font-family: "Syne", sans-serif;
+      font-size: 16px;
+      font-weight: 800;
+      letter-spacing: 0.8px;
+    }
+
+    .small-stat-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    .small-stat {
+      padding-top: 8px;
+      border-top: 1px solid rgba(0,212,255,0.055);
+    }
+
+    .feed {
+      display: grid;
+      gap: 8px;
+      max-height: 472px;
+      overflow: auto;
+    }
+
+    .feed-item {
+      display: grid;
+      grid-template-columns: 86px minmax(0, 1fr);
+      gap: 10px;
+      padding: 10px 12px;
+      border: 1px solid rgba(0,212,255,0.055);
+      border-left-color: rgba(0,212,255,0.18);
+      border-radius: var(--radius);
+      background: rgba(5,9,20,0.42);
+    }
+
+    .feed-time {
+      color: var(--text-dim);
+      font-size: 10px;
+    }
+
+    .feed-message {
+      color: var(--text);
+      font-size: 11px;
+      line-height: 1.5;
+    }
+
+    .tag-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 9px;
+    }
+
+    .tag {
+      padding: 2px 6px;
+      border: 1px solid rgba(0,212,255,0.065);
+      border-radius: var(--radius);
+      color: var(--text-dim);
+      background: rgba(255,255,255,0.016);
+      font-size: 9px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+
+    .regime-card {
+      min-height: 136px;
+    }
+
+    .regime-value {
+      margin-top: 18px;
+      color: var(--text);
+      font-family: "Syne", sans-serif;
+      font-size: clamp(24px, 2.4vw, 42px);
+      font-weight: 800;
+      line-height: 0.95;
+      letter-spacing: 0;
+    }
+
+    .playbook {
+      display: grid;
+      grid-template-columns: 190px minmax(0, 1fr);
+      gap: 8px;
+      align-items: stretch;
+    }
+
+    .playbook-primary {
+      display: grid;
+      align-content: center;
+      min-height: 150px;
+      padding: 16px;
+      border: 1px solid rgba(0,212,255,0.055);
+      border-radius: var(--radius);
+      background: rgba(5,9,20,0.38);
+    }
+
+    .playbook-list {
+      display: grid;
+      gap: 8px;
+    }
+
+    .rule-row {
+      display: grid;
+      grid-template-columns: 160px minmax(0, 1fr);
+      gap: 12px;
+      padding: 10px 12px;
+      border: 1px solid rgba(0,212,255,0.045);
+      border-radius: var(--radius);
+      background: rgba(255,255,255,0.014);
+    }
+
+    .chart-frame {
+      position: relative;
+      min-height: 260px;
+      padding: 8px;
+      border: 1px solid rgba(0,212,255,0.045);
+      border-radius: var(--radius);
+      background: rgba(5,9,20,0.36);
+    }
+
+    .chart-frame.compact {
+      min-height: 220px;
+    }
+
+    .chart-frame canvas {
+      width: 100% !important;
+      height: 100% !important;
+    }
+
+    .empty-state,
+    .error-state,
+    .loading-state {
+      display: grid;
+      min-height: 168px;
+      place-items: center;
+      padding: 28px;
+      text-align: center;
+    }
+
+    .state-title {
+      color: var(--text);
+      font-family: "Syne", sans-serif;
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: 0.7px;
+    }
+
+    .state-copy {
+      max-width: 420px;
+      margin: 8px auto 0;
+      color: var(--text-dim);
+      font-size: 11px;
+      line-height: 1.65;
+    }
+
+    .skeleton-grid {
+      display: grid;
+      width: 100%;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .skeleton-line,
+    .skeleton-card {
+      position: relative;
+      overflow: hidden;
+      border-radius: var(--radius);
+      background: rgba(90,122,150,0.09);
+    }
+
+    .skeleton-card {
+      height: 84px;
+    }
+
+    .skeleton-line {
+      height: 11px;
+      margin: 9px 0;
+    }
+
+    .skeleton-line::after,
+    .skeleton-card::after {
+      position: absolute;
+      inset: 0;
+      content: "";
+      transform: translateX(-100%);
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.075), transparent);
+      animation: shimmer 1.75s infinite;
+    }
+
+    @keyframes shimmer {
+      100% { transform: translateX(100%); }
+    }
+
+    .partial-warning {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 10px;
+      padding: 9px 10px;
+      border: 1px solid rgba(255,209,102,0.14);
+      border-radius: var(--radius);
+      color: var(--yellow);
+      background: rgba(255,209,102,0.04);
+      font-size: 10px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+
+    .micro-list {
+      display: grid;
+      gap: 8px;
+    }
+
+    .micro-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 10px;
+      align-items: center;
+      padding: 10px 0;
+      border-bottom: 1px solid rgba(0,212,255,0.045);
+    }
+
+    .micro-row:last-child {
+      border-bottom: 0;
+    }
+
+    .quality-bar {
+      width: 100%;
+      height: 5px;
+      margin-top: 7px;
+      overflow: hidden;
+      border-radius: var(--radius);
+      background: rgba(90,122,150,0.12);
+    }
+
+    .quality-fill {
+      height: 100%;
+      background: var(--accent);
+    }
+
+    .alert-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 8px;
+    }
+
+    .alert-column {
+      display: grid;
+      align-content: start;
+      gap: 8px;
+    }
+
+    .alert-card {
+      border-left-color: rgba(0,212,255,0.24);
+    }
+
+    .alert-card.tier-1 {
+      border-left-color: rgba(255,61,107,0.42);
+    }
+
+    .alert-card.tier-2 {
+      border-left-color: rgba(255,209,102,0.38);
+    }
+
+    .alert-card.tier-3 {
+      border-left-color: rgba(90,122,150,0.22);
+    }
+
+    .muted {
+      color: var(--text-dim);
+    }
+
+    .divider {
+      height: 1px;
+      margin: 12px 0;
+      background: rgba(0,212,255,0.055);
+    }
+
+    @media (max-width: 1200px) {
+      :root {
+        --sidebar-width: 88px;
+      }
+
+      .brand {
+        padding: 22px 12px 18px;
+      }
+
+      .brand-title {
+        font-size: 16px;
+        text-align: center;
+      }
+
+      .brand-title .word {
+        display: none;
+      }
+
+      .brand-meta,
+      .nav-label,
+      .sidebar-telemetry .label,
+      .sidebar-telemetry .value,
+      .risk-rail {
+        display: none;
+      }
+
+      .nav-button {
+        grid-template-columns: 1fr;
+        justify-items: center;
+        padding: 0;
+      }
+
+      .sidebar-telemetry {
+        padding: 12px;
+      }
+
+      .telemetry-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .telemetry-cell {
+        min-height: 24px;
+        padding: 0;
+        border-color: transparent;
+        background: transparent;
+      }
+
+      .topbar {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+      }
+
+      .topbar-item:nth-child(n+5) {
+        display: none;
+      }
+
+      .metric-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+
+      .spotlight-grid,
+      .quad-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .span-9,
+      .span-8,
+      .span-7,
+      .span-6,
+      .span-5,
+      .span-4,
+      .span-3,
+      .span-2 {
+        grid-column: span 12;
+      }
+    }
+
+    @media (max-width: 768px) {
+      :root {
+        --sidebar-width: 0px;
+        --topbar-height: 92px;
+      }
+
+      .sidebar {
+        position: sticky;
+        top: 0;
+        right: 0;
+        bottom: auto;
+        width: 100%;
+        height: auto;
+        border-right: 0;
+        border-bottom: 1px solid var(--border);
+      }
+
+      .brand,
+      .sidebar-telemetry {
+        display: none;
+      }
+
+      .nav {
+        display: flex;
+        gap: 4px;
+        overflow-x: auto;
+        padding: 8px;
+      }
+
+      .nav-button {
+        flex: 0 0 auto;
+        grid-template-columns: auto auto;
+        min-width: 118px;
+        padding: 0 10px;
+      }
+
+      .nav-label {
+        display: inline;
+        font-size: 10px;
+      }
+
+      .topbar {
+        position: sticky;
+        top: 42px;
+        left: 0;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .topbar-item:nth-child(n+5) {
+        display: flex;
+      }
+
+      .topbar-item:nth-child(n+3) {
+        display: none;
+      }
+
+      .workspace {
+        margin-left: 0;
+        padding: 8px;
+      }
+
+      .workspace-inner {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+      }
+
+      .span-12,
+      .span-9,
+      .span-8,
+      .span-7,
+      .span-6,
+      .span-5,
+      .span-4,
+      .span-3,
+      .span-2 {
+        grid-column: span 4;
+      }
+
+      .metric-grid,
+      .split-grid,
+      .triple-grid,
+      .quad-grid,
+      .spotlight-grid,
+      .alert-grid,
+      .skeleton-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .panel-header {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+
+      .toolbar {
+        width: 100%;
+        justify-content: stretch;
+      }
+
+      .select-control {
+        width: 100%;
+      }
+
+      .playbook,
+      .rule-row {
+        grid-template-columns: 1fr;
+      }
+
+      .table-wrap {
+        max-height: none;
+        border: 0;
+        background: transparent;
+      }
+
+      table {
+        min-width: 0;
+      }
+
+      thead {
+        display: none;
+      }
+
+      tbody,
+      tr,
+      td {
+        display: block;
+        width: 100%;
+      }
+
+      tr {
+        margin-bottom: 8px;
+        border: 1px solid rgba(0,212,255,0.06);
+        border-radius: var(--radius);
+        background: rgba(10,16,30,0.64);
+      }
+
+      td {
+        display: grid;
+        grid-template-columns: 132px minmax(0, 1fr);
+        gap: 10px;
+        padding: 9px 10px;
+        border-bottom: 1px solid rgba(0,212,255,0.04);
+        white-space: normal;
+      }
+
+      td::before {
+        content: attr(data-label);
+        color: var(--text-dim);
+        font-size: 9px;
+        letter-spacing: 1.5px;
+        text-transform: uppercase;
+      }
+
+      .right,
+      .center {
+        text-align: left;
+      }
+    }
+  </style>
+</head>
+<body>
+  <section class="terminal-shell" aria-label="Institutional trading terminal">
+    <aside class="sidebar" aria-label="Primary navigation">
+      <section class="brand" aria-label="Terminal identity">
+        <h1 class="brand-title"><span>Q</span><span class="word">UANT</span><br>TERMINAL</h1>
+        <p class="brand-meta"><span id="sidebarModeDot" class="status-dot"></span><span id="sidebarMode">Initializing</span></p>
+      </section>
+
+      <nav id="tabNav" class="nav" role="tablist" aria-label="Terminal sections">
+        <button class="nav-button" type="button" role="tab" aria-selected="true" data-tab="live">
+          <span class="nav-index">01</span><span class="nav-label">Live Trading</span>
+        </button>
+        <button class="nav-button" type="button" role="tab" aria-selected="false" data-tab="eod">
+          <span class="nav-index">02</span><span class="nav-label">EOD Predictions</span>
+        </button>
+        <button class="nav-button" type="button" role="tab" aria-selected="false" data-tab="watchlist">
+          <span class="nav-index">03</span><span class="nav-label">Watchlist</span>
+        </button>
+        <button class="nav-button" type="button" role="tab" aria-selected="false" data-tab="regime">
+          <span class="nav-index">04</span><span class="nav-label">Regime</span>
+        </button>
+        <button class="nav-button" type="button" role="tab" aria-selected="false" data-tab="scanner">
+          <span class="nav-index">05</span><span class="nav-label">Scanner</span>
+        </button>
+        <button class="nav-button" type="button" role="tab" aria-selected="false" data-tab="performance">
+          <span class="nav-index">06</span><span class="nav-label">Performance</span>
+        </button>
+      </nav>
+
+      <section class="sidebar-telemetry" aria-label="Terminal telemetry">
+        <section class="telemetry-grid">
+          <article class="telemetry-cell">
+            <span class="label">Uptime</span>
+            <span id="sideUptime" class="value">--</span>
+          </article>
+          <article class="telemetry-cell">
+            <span class="label">Latency</span>
+            <span id="sideLatency" class="value">--</span>
+          </article>
+          <article class="telemetry-cell">
+            <span class="label">Open Risk</span>
+            <span id="sideRisk" class="value">--</span>
+          </article>
+          <article class="telemetry-cell">
+            <span class="label">Refresh</span>
+            <span id="sideRefresh" class="value">30s</span>
+          </article>
+        </section>
+        <section aria-label="Risk budget">
+          <span class="label">Daily P&L Pressure</span>
+          <div class="risk-rail" aria-hidden="true"><div id="riskFill" class="risk-fill"></div></div>
+        </section>
+      </section>
+    </aside>
+
+    <header class="topbar" aria-label="System status">
+      <section class="topbar-item">
+        <span class="label">Mode</span>
+        <span id="statusMode" class="topbar-value">--</span>
+      </section>
+      <section class="topbar-item">
+        <span class="label">Server Time IST</span>
+        <span id="statusTime" class="topbar-value">--</span>
+      </section>
+      <section class="topbar-item">
+        <span class="label">Connection</span>
+        <span id="statusConnection" class="topbar-value">--</span>
+      </section>
+      <section class="topbar-item">
+        <span class="label">API Latency</span>
+        <span id="statusLatency" class="topbar-value">--</span>
+      </section>
+      <section class="topbar-item">
+        <span class="label">Refresh</span>
+        <span id="statusRefresh" class="topbar-value">30s</span>
+      </section>
+      <section class="topbar-item">
+        <span class="label">Market</span>
+        <span id="statusMarket" class="topbar-value">--</span>
+      </section>
+      <section class="topbar-item">
+        <span class="label">API Health</span>
+        <span id="statusFailure" class="topbar-value">--</span>
+      </section>
+    </header>
+
+    <main id="workspace" class="workspace" tabindex="-1" aria-live="polite"></main>
+  </section>
+
+  <script>
+    (() => {
+      "use strict";
+
+      const ENDPOINTS = {
+        status: "/api/status",
+        positions: "/api/positions",
+        signals: "/api/signals",
+        predictions: "/api/eod/predictions",
+        watchlist: "/api/eod/watchlist",
+        patterns: "/api/eod/patterns",
+        regime: "/api/regime",
+        alerts: "/api/alerts",
+        performance: "/api/performance"
+      };
+
+      const TAB_REQUIREMENTS = {
+        live: ["status", "positions", "signals", "regime", "performance"],
+        eod: ["predictions"],
+        watchlist: ["watchlist", "patterns"],
+        regime: ["regime"],
+        scanner: ["alerts"],
+        performance: ["performance"]
+      };
+
+      const AppState = {
+        activeTab: "live",
+        resources: Object.fromEntries(Object.keys(ENDPOINTS).map((key) => [key, {
+          status: "idle",
+          data: null,
+          error: null,
+          updatedAt: null
+        }])),
+        filters: {
+          predictionsSignal: "ALL",
+          predictionsTier: "ALL",
+          predictionsConfidence: "ALL",
+          predictionsSector: "ALL",
+          watchlistSource: "ALL",
+          alertTier: "ALL"
+        },
+        sorts: {
+          positions: { key: "pnl_inr", direction: "desc" },
+          predictions: { key: "expected_return_pct", direction: "desc" },
+          watchlist: { key: "score", direction: "desc" },
+          patterns: { key: "quality", direction: "desc" },
+          global: { key: "name", direction: "asc" },
+          performanceSymbols: { key: "sharpe_90d", direction: "desc" },
+          eodAccuracy: { key: "hit_rate", direction: "desc" }
+        },
+        scheduler: {
+          intervalId: null,
+          countdownId: null,
+          countdown: 30,
+          refreshing: false
+        }
+      };
+
+      const DOM = {
+        workspace: document.getElementById("workspace"),
+        nav: document.getElementById("tabNav"),
+        statusMode: document.getElementById("statusMode"),
+        statusTime: document.getElementById("statusTime"),
+        statusConnection: document.getElementById("statusConnection"),
+        statusLatency: document.getElementById("statusLatency"),
+        statusRefresh: document.getElementById("statusRefresh"),
+        statusMarket: document.getElementById("statusMarket"),
+        statusFailure: document.getElementById("statusFailure"),
+        sidebarMode: document.getElementById("sidebarMode"),
+        sidebarModeDot: document.getElementById("sidebarModeDot"),
+        sideUptime: document.getElementById("sideUptime"),
+        sideLatency: document.getElementById("sideLatency"),
+        sideRisk: document.getElementById("sideRisk"),
+        sideRefresh: document.getElementById("sideRefresh"),
+        riskFill: document.getElementById("riskFill")
+      };
+
+      const ChartManager = {
+        instances: new Map(),
+        baseOptions(extra = {}) {
+          return {
+            responsive: true,
+            maintainAspectRatio: false,
+            animation: { duration: 420, easing: "easeOutQuart" },
+            color: "#c8d8e8",
+            interaction: { mode: "index", intersect: false },
+            plugins: {
+              legend: {
+                labels: {
+                  color: "#5a7a96",
+                  boxWidth: 10,
+                  boxHeight: 2,
+                  font: { family: "Space Mono", size: 10 }
+                }
+              },
+              tooltip: {
+                displayColors: false,
+                backgroundColor: "rgba(10,16,30,0.96)",
+                borderColor: "rgba(0,212,255,0.16)",
+                borderWidth: 1,
+                titleColor: "#c8d8e8",
+                bodyColor: "#c8d8e8",
+                titleFont: { family: "Syne", size: 12, weight: "700" },
+                bodyFont: { family: "Space Mono", size: 11 },
+                padding: 10
+              }
+            },
+            scales: {
+              x: {
+                grid: { color: "rgba(0,212,255,0.035)", drawBorder: false },
+                ticks: { color: "#5a7a96", font: { family: "Space Mono", size: 10 }, maxRotation: 0 }
+              },
+              y: {
+                grid: { color: "rgba(0,212,255,0.045)", drawBorder: false },
+                ticks: { color: "#5a7a96", font: { family: "Space Mono", size: 10 } }
+              }
+            },
+            ...extra
+          };
+        },
+        render(id, config) {
+          const canvas = document.getElementById(id);
+          if (!canvas || !window.Chart) return;
+
+          const existing = this.instances.get(id);
+          if (existing && existing.config.type === config.type) {
+            existing.data.labels = config.data.labels;
+            existing.data.datasets = config.data.datasets;
+            existing.options = config.options;
+            existing.update("none");
+            return;
+          }
+
+          if (existing) existing.destroy();
+          this.instances.set(id, new Chart(canvas, config));
+        },
+        destroyExcept(ids) {
+          for (const [id, chart] of this.instances.entries()) {
+            if (!ids.has(id)) {
+              chart.destroy();
+              this.instances.delete(id);
+            }
+          }
+        }
+      };
+
+      function formatCurrency(value) {
+        const n = Number(value);
+        if (!Number.isFinite(n)) return "--";
+        return new Intl.NumberFormat("en-IN", {
+          style: "currency",
+          currency: "INR",
+          maximumFractionDigits: Math.abs(n) < 1000 ? 2 : 0
+        }).format(n);
+      }
+
+      function formatPercent(value, decimals = 2) {
+        const n = Number(value);
+        if (!Number.isFinite(n)) return "--";
+        return `${n > 0 ? "+" : ""}${n.toFixed(decimals)}%`;
+      }
+
+      function normalizedPercent(value) {
+        const n = Number(value);
+        if (!Number.isFinite(n)) return 0;
+        return Math.abs(n) <= 1 ? n * 100 : n;
+      }
+
+      function formatRatioPercent(value, decimals = 1) {
+        const n = normalizedPercent(value);
+        return `${n.toFixed(decimals)}%`;
+      }
+
+      function compactNumber(value) {
+        const n = Number(value);
+        if (!Number.isFinite(n)) return "--";
+        return new Intl.NumberFormat("en-IN", { notation: "compact", maximumFractionDigits: 2 }).format(n);
+      }
+
+      function timeAgo(value) {
+        if (!value) return "--";
+        const time = new Date(String(value).replace(" ", "T"));
+        if (Number.isNaN(time.getTime())) return String(value);
+        const seconds = Math.max(0, Math.floor((Date.now() - time.getTime()) / 1000));
+        if (seconds < 60) return `${seconds}s ago`;
+        const minutes = Math.floor(seconds / 60);
+        if (minutes < 60) return `${minutes}m ago`;
+        const hours = Math.floor(minutes / 60);
+        if (hours < 24) return `${hours}h ago`;
+        return `${Math.floor(hours / 24)}d ago`;
+      }
+
+      function signalBadge(side) {
+        const label = String(side || "HOLD").toUpperCase();
+        const className = label === "BUY" || label === "LONG" ? "buy" : label === "SELL" || label === "SHORT" ? "sell" : "hold";
+        return `<span class="badge ${className}">${escapeHtml(label)}</span>`;
+      }
+
+      function tierBadge(tier) {
+        const raw = String(tier || "UNRANKED").toUpperCase();
+        const normalized = raw.replaceAll("_", " ");
+        const className = raw.includes("HIGH") ? "high" : raw.includes("MODERATE") || raw === "2" ? "medium" : raw.includes("SPEC") || raw === "3" ? "speculative" : raw === "1" ? "tier-1" : "";
+        return `<span class="badge ${className}">${escapeHtml(normalized)}</span>`;
+      }
+
+      function pnlColor(value) {
+        const n = Number(value);
+        if (!Number.isFinite(n) || n === 0) return "text-neutral";
+        return n > 0 ? "text-positive" : "text-negative";
+      }
+
+      function sleep(ms) {
+        return new Promise((resolve) => window.setTimeout(resolve, ms));
+      }
+
+      async function fetchJson(endpoint, { retries = 1, timeout = 7000 } = {}) {
+        let lastError;
+        for (let attempt = 0; attempt <= retries; attempt += 1) {
+          const controller = new AbortController();
+          const timer = window.setTimeout(() => controller.abort(), timeout);
+          try {
+            const response = await fetch(endpoint, {
+              headers: { "Accept": "application/json" },
+              cache: "no-store",
+              signal: controller.signal
+            });
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            return await response.json();
+          } catch (error) {
+            lastError = error;
+            if (attempt < retries) await sleep(260 * (attempt + 1));
+          } finally {
+            window.clearTimeout(timer);
+          }
+        }
+        throw lastError;
+      }
+
+      async function loadResource(key, { soft = false } = {}) {
+        const resource = AppState.resources[key];
+        if (!resource) return null;
+        if (!soft || !resource.data) {
+          resource.status = "loading";
+          resource.error = null;
+        }
+        try {
+          const data = await fetchJson(ENDPOINTS[key], { retries: key === "status" ? 1 : 2 });
+          resource.data = data;
+          resource.status = "ready";
+          resource.error = null;
+          resource.updatedAt = Date.now();
+          return data;
+        } catch (error) {
+          resource.status = resource.data ? "stale-error" : "error";
+          resource.error = error;
+          return null;
+        }
+      }
+
+      async function loadResources(keys, options = {}) {
+        await Promise.all(keys.map((key) => loadResource(key, options)));
+        renderChrome();
+      }
+
+      function getResource(key) {
+        return AppState.resources[key] || { status: "idle", data: null, error: null };
+      }
+
+      function normalizeArray(key) {
+        const data = getResource(key).data;
+        if (!data) return [];
+        if (Array.isArray(data)) return data;
+        if (key === "signals") return Array.isArray(data.signals) ? data.signals : [];
+        if (key === "predictions") return Array.isArray(data.predictions) ? data.predictions : [];
+        if (key === "watchlist") return Array.isArray(data.watchlist) ? data.watchlist : [];
+        if (key === "patterns") return Array.isArray(data.patterns) ? data.patterns : [];
+        if (key === "alerts") return Array.isArray(data.alerts) ? data.alerts : [];
+        return [];
+      }
+
+      function escapeHtml(value) {
+        return String(value ?? "").replace(/[&<>"']/g, (char) => ({
+          "&": "&amp;",
+          "<": "&lt;",
+          ">": "&gt;",
+          "\"": "&quot;",
+          "'": "&#039;"
+        })[char]);
+      }
+
+      function numeric(value, fallback = 0) {
+        const n = Number(value);
+        return Number.isFinite(n) ? n : fallback;
+      }
+
+      function clamp(value, min = 0, max = 100) {
+        return Math.min(max, Math.max(min, value));
+      }
+
+      function section(title, meta = "", body = "", span = "span-12", extra = "") {
+        return `
+          <section class="panel ${span} ${extra}">
+            <header class="panel-header">
+              <h2 class="panel-title">${escapeHtml(title)}</h2>
+              ${meta ? `<span class="panel-meta">${meta}</span>` : ""}
+            </header>
+            <div class="panel-body">${body}</div>
+          </section>
+        `;
+      }
+
+      function loadingState(lines = 6) {
+        const cards = Array.from({ length: Math.min(lines, 6) }, () => "<div class=\"skeleton-card\"></div>").join("");
+        const lineHtml = Array.from({ length: lines }, () => "<div class=\"skeleton-line\"></div>").join("");
+        return `
+          <section class="loading-state" aria-busy="true">
+            <div style="width:100%">
+              <div class="skeleton-grid">${cards}</div>
+              <div style="margin-top:14px">${lineHtml}</div>
+            </div>
+          </section>
+        `;
+      }
+
+      function emptyState(title, copy) {
+        return `
+          <section class="empty-state">
+            <div>
+              <div class="state-title">${escapeHtml(title)}</div>
+              <p class="state-copy">${escapeHtml(copy)}</p>
+            </div>
+          </section>
+        `;
+      }
+
+      function errorState(title, copy, keys) {
+        return `
+          <section class="error-state">
+            <div>
+              <div class="state-title">${escapeHtml(title)}</div>
+              <p class="state-copy">${escapeHtml(copy)}</p>
+              <button class="retry-button" type="button" data-action="retry" data-keys="${escapeHtml(keys.join(","))}">Retry</button>
+            </div>
+          </section>
+        `;
+      }
+
+      function partialWarning(keys) {
+        const failed = keys.filter((key) => ["error", "stale-error"].includes(getResource(key).status));
+        if (!failed.length) return "";
+        return `
+          <div class="partial-warning">
+            <span>Partial data degradation: ${failed.map((key) => key.toUpperCase()).join(", ")}</span>
+            <button class="retry-button" type="button" data-action="retry" data-keys="${escapeHtml(failed.join(","))}">Retry</button>
+          </div>
+        `;
+      }
+
+      function resourceGate(keys, render, emptyCheck, emptyTitle, emptyCopy) {
+        const resources = keys.map(getResource);
+        const anyLoading = resources.some((resource) => resource.status === "loading" || resource.status === "idle");
+        const noData = resources.every((resource) => !resource.data);
+        const allFailed = resources.every((resource) => resource.status === "error");
+        if (anyLoading && noData) return loadingState();
+        if (allFailed || (noData && resources.some((resource) => resource.status === "error"))) {
+          return errorState("Data unavailable", "The API did not return a usable response for this section.", keys);
+        }
+        if (emptyCheck()) return emptyState(emptyTitle, emptyCopy);
+        return `${partialWarning(keys)}${render()}`;
+      }
+
+      function metricCard(label, value, foot = "", colorClass = "", countValue = null, format = "") {
+        const countAttrs = countValue === null ? "" : ` data-count="${Number(countValue)}" data-format="${format}"`;
+        return `
+          <article class="metric-card">
+            <span class="label">${escapeHtml(label)}</span>
+            <output class="metric-value ${colorClass}"${countAttrs}>${value}</output>
+            ${foot ? `<p class="metric-foot">${escapeHtml(foot)}</p>` : ""}
+          </article>
+        `;
+      }
+
+      function animateCounters(root = DOM.workspace) {
+        if (!window.gsap) return;
+        root.querySelectorAll("[data-count]").forEach((node) => {
+          const target = Number(node.dataset.count);
+          if (!Number.isFinite(target) || node.dataset.animated === "true") return;
+          node.dataset.animated = "true";
+          const format = node.dataset.format;
+          const state = { value: 0 };
+          gsap.to(state, {
+            value: target,
+            duration: 0.75,
+            ease: "power2.out",
+            onUpdate: () => {
+              const v = state.value;
+              if (format === "currency") node.textContent = formatCurrency(v);
+              else if (format === "percent") node.textContent = formatPercent(v);
+              else node.textContent = Math.round(v).toLocaleString("en-IN");
+            }
+          });
+        });
+      }
+
+      function sortRows(rows, sortId) {
+        const sort = AppState.sorts[sortId];
+        if (!sort) return rows;
+        const direction = sort.direction === "asc" ? 1 : -1;
+        return [...rows].sort((a, b) => {
+          const av = a[sort.key];
+          const bv = b[sort.key];
+          const an = Number(av);
+          const bn = Number(bv);
+          if (Number.isFinite(an) && Number.isFinite(bn)) return (an - bn) * direction;
+          return String(av ?? "").localeCompare(String(bv ?? "")) * direction;
+        });
+      }
+
+      function renderTable({ columns, rows, sortId, rowClass = () => "", emptyTitle = "No rows", emptyCopy = "No records matched the current filter." }) {
+        if (!rows.length) return emptyState(emptyTitle, emptyCopy);
+        const sort = AppState.sorts[sortId] || {};
+        const head = columns.map((column) => {
+          const sortable = column.sort !== false;
+          const ariaSort = sort.key === column.key ? (sort.direction === "asc" ? "ascending" : "descending") : "none";
+          return `<th class="${column.align || ""}" ${sortable ? `data-sort-id="${sortId}" data-sort-key="${column.key}" aria-sort="${ariaSort}"` : ""}>${escapeHtml(column.label)}</th>`;
+        }).join("");
+        const body = rows.map((row) => {
+          const cells = columns.map((column) => {
+            const rendered = column.render ? column.render(row[column.key], row) : escapeHtml(row[column.key] ?? "--");
+            return `<td class="${column.align || ""}" data-label="${escapeHtml(column.label)}">${rendered}</td>`;
+          }).join("");
+          return `<tr class="${rowClass(row)}">${cells}</tr>`;
+        }).join("");
+        return `<div class="table-wrap"><table><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table></div>`;
+      }
+
+      function renderChrome() {
+        const status = getResource("status");
+        const data = status.data || {};
+        const degraded = Object.entries(AppState.resources)
+          .filter(([key, resource]) => key !== "status" && ["error", "stale-error"].includes(resource.status));
+        const mode = data.mode || "--";
+        const market = data.market_status || "--";
+        const latency = Number.isFinite(Number(data.api_latency_ms)) ? `${data.api_latency_ms} ms` : "--";
+        const connected = status.status === "ready" ? "CONNECTED" : status.status === "error" ? "OFFLINE" : "SYNCING";
+
+        DOM.statusMode.textContent = mode;
+        DOM.statusTime.textContent = data.server_time_ist || "--";
+        DOM.statusConnection.innerHTML = `<span class="status-dot ${connected === "CONNECTED" ? "is-ok" : connected === "OFFLINE" ? "is-error" : "is-warn"}" style="display:inline-block;margin-right:8px"></span>${connected}`;
+        DOM.statusLatency.textContent = latency;
+        DOM.statusRefresh.textContent = `${AppState.scheduler.countdown}s`;
+        DOM.statusMarket.innerHTML = `<span class="status-dot ${market === "OPEN" ? "is-open" : market === "CLOSED" ? "is-closed" : ""}" style="display:inline-block;margin-right:8px"></span>${market}`;
+        DOM.statusFailure.textContent = degraded.length ? `DEGRADED ${degraded.length}` : "NOMINAL";
+        DOM.statusFailure.className = degraded.length ? "topbar-value text-negative" : "topbar-value text-positive";
+
+        DOM.sidebarMode.textContent = `${mode} MODE`;
+        DOM.sidebarModeDot.className = `status-dot ${mode === "LIVE" ? "is-live" : mode === "PAPER" ? "is-paper" : ""}`;
+        DOM.sideUptime.textContent = Number.isFinite(Number(data.uptime_minutes)) ? `${Math.floor(data.uptime_minutes / 60)}h ${data.uptime_minutes % 60}m` : "--";
+        DOM.sideLatency.textContent = latency;
+        DOM.sideRefresh.textContent = `${AppState.scheduler.countdown}s`;
+
+        const positions = normalizeArray("positions");
+        const openRisk = positions.reduce((sum, pos) => sum + Math.max(0, Math.abs(numeric(pos.entry_price) - numeric(pos.stop_loss)) * numeric(pos.qty)), 0);
+        const deployed = positions.reduce((sum, pos) => sum + Math.abs(numeric(pos.ltp || pos.entry_price) * numeric(pos.qty)), 0);
+        const riskPct = deployed ? clamp(openRisk / deployed * 100, 0, 100) : 0;
+        DOM.sideRisk.textContent = deployed ? `${riskPct.toFixed(1)}%` : "--";
+        DOM.riskFill.style.width = `${riskPct}%`;
+        DOM.riskFill.style.background = riskPct > 8 ? "var(--red)" : riskPct > 4 ? "var(--yellow)" : "linear-gradient(90deg, rgba(0,212,255,0.2), var(--accent))";
+      }
+
+      function renderTabShell() {
+        const tab = AppState.activeTab;
+        ChartManager.destroyExcept(new Set());
+        DOM.workspace.innerHTML = `<section class="workspace-inner" id="workspaceInner">${renderLoadingForTab(tab)}</section>`;
+        DOM.workspace.focus({ preventScroll: true });
+      }
+
+      function renderLoadingForTab(tab) {
+        const titles = {
+          live: ["Live Metrics", "Portfolio", "Regime Sizing", "Signals"],
+          eod: ["EOD Summary", "Distribution", "Predictions", "BUY Spotlight"],
+          watchlist: ["Source Breakdown", "Watchlist", "Momentum", "Patterns"],
+          regime: ["Regime Cards", "Playbook", "Global Context", "Sector Rotation"],
+          scanner: ["Tier 1", "Tier 2", "Tier 3"],
+          performance: ["Summary", "Cumulative P&L", "Daily P&L", "Model Tables"]
+        };
+        return titles[tab].map((title, index) => section(title, "loading", loadingState(), index === 0 ? "span-12" : "span-6")).join("");
+      }
+
+      async function selectTab(tab, { soft = false } = {}) {
+        if (!TAB_REQUIREMENTS[tab]) return;
+        AppState.activeTab = tab;
+        DOM.nav.querySelectorAll(".nav-button").forEach((button) => {
+          button.setAttribute("aria-selected", String(button.dataset.tab === tab));
+        });
+        if (!soft) renderTabShell();
+        await loadResources(TAB_REQUIREMENTS[tab], { soft });
+        renderActiveTab();
+      }
+
+      function renderActiveTab() {
+        const renderers = {
+          live: renderLiveTrading,
+          eod: renderEodPredictions,
+          watchlist: renderWatchlistPatterns,
+          regime: renderRegimeContext,
+          scanner: renderIntradayScanner,
+          performance: renderPerformance
+        };
+        renderers[AppState.activeTab]();
+        animateCounters();
+        if (window.gsap) {
+          gsap.fromTo(".panel, .metric-card", { opacity: 0.94 }, { opacity: 1, duration: 0.24, ease: "power1.out", stagger: 0.01 });
+        }
+      }
+
+      function renderLiveTrading() {
+        const positions = normalizeArray("positions");
+        const signals = normalizeArray("signals");
+        const regime = getResource("regime").data || {};
+        const performance = getResource("performance").data || {};
+        const latestDay = Array.isArray(performance.daily_history) ? performance.daily_history.at(-1) : null;
+        const totalPnl = positions.reduce((sum, pos) => sum + numeric(pos.pnl_inr), 0);
+        const exposure = positions.reduce((sum, pos) => sum + Math.abs(numeric(pos.qty) * numeric(pos.ltp || pos.entry_price)), 0);
+        const trades = numeric(latestDay?.trades, signals.length);
+        const winRate = normalizedPercent(latestDay?.win_rate);
+        const wins = trades ? Math.round(trades * winRate / 100) : 0;
+        const losses = Math.max(0, trades - wins);
+
+        const metrics = `
+          <section class="metric-grid">
+            ${metricCard("Today P&L", formatCurrency(totalPnl), "open position mark-to-market", pnlColor(totalPnl), totalPnl, "currency")}
+            ${metricCard("Open Positions", positions.length.toLocaleString("en-IN"), "active portfolio rows", "", positions.length)}
+            ${metricCard("Trades Today", trades.toLocaleString("en-IN"), latestDay?.date || "session activity", "", trades)}
+            ${metricCard("Win/Loss", `${wins}/${losses}`, `${formatRatioPercent(winRate)} realized win rate`, winRate >= 50 ? "positive" : "neutral")}
+            ${metricCard("Capital", formatCurrency(exposure), "gross open exposure", "", exposure, "currency")}
+            ${metricCard("Bot Status", getResource("status").data?.mode === "LIVE" ? "LIVE" : "PAPER", "execution mode", getResource("status").data?.mode === "LIVE" ? "positive" : "neutral")}
+          </section>
+        `;
+
+        const portfolioBody = resourceGate(["positions"], () => {
+          const sorted = sortRows(positions, "positions");
+          return renderTable({
+            sortId: "positions",
+            rows: sorted,
+            rowClass: (row) => numeric(row.pnl_inr) > 0 ? "row-buy" : numeric(row.pnl_inr) < 0 ? "row-sell" : "",
+            columns: [
+              { key: "symbol", label: "Symbol", render: (v) => `<strong>${escapeHtml(v)}</strong>` },
+              { key: "side", label: "Side", render: signalBadge },
+              { key: "qty", label: "Qty", align: "right" },
+              { key: "entry_price", label: "Entry", align: "right", render: formatCurrency },
+              { key: "ltp", label: "LTP", align: "right", render: formatCurrency },
+              { key: "pnl_inr", label: "P&L", align: "right", render: (v) => `<span class="${pnlColor(v)}">${formatCurrency(v)}</span>` },
+              { key: "pnl_pct", label: "P&L %", align: "right", render: (v) => `<span class="${pnlColor(v)}">${formatPercent(numeric(v))}</span>` },
+              { key: "stop_loss", label: "Stop", align: "right", render: formatCurrency },
+              { key: "target", label: "Target", align: "right", render: formatCurrency },
+              { key: "rr_ratio", label: "R:R", align: "right", render: (v) => numeric(v).toFixed(2) }
+            ]
+          });
+        }, () => !positions.length, "No open positions", "The portfolio API is connected, but no active positions are open.");
+
+        const sizingBody = resourceGate(["regime"], () => {
+          const playbook = regime.playbook || {};
+          const size = numeric(playbook.size_multiplier, 1);
+          const stop = numeric(playbook.stop_multiplier, 1);
+          return `
+            <section class="playbook">
+              <article class="playbook-primary">
+                <span class="label">Regime Sizing</span>
+                <strong class="regime-value ${size < 1 ? "text-neutral" : "text-positive"}">${size.toFixed(2)}x</strong>
+                <span class="metric-foot">Base position size multiplier</span>
+              </article>
+              <section class="playbook-list">
+                <div class="rule-row"><span class="label">Bias</span><span>${signalBadge(playbook.bias || "NEUTRAL")}</span></div>
+                <div class="rule-row"><span class="label">Stop Multiplier</span><span>${stop.toFixed(2)}x</span></div>
+                <div class="rule-row"><span class="label">Preferred</span><span>${(playbook.preferred_setups || []).map(escapeHtml).join(", ") || "--"}</span></div>
+                <div class="rule-row"><span class="label">Avoid</span><span>${(playbook.avoid_setups || []).map(escapeHtml).join(", ") || "--"}</span></div>
+              </section>
+            </section>
+          `;
+        }, () => !regime.playbook, "Regime playbook unavailable", "Sizing guidance has not been published by the regime service.");
+
+        const signalsBody = resourceGate(["signals"], () => {
+          return `<section class="feed">${signals.slice(0, 18).map((signal) => `
+            <article class="feed-item">
+              <time class="feed-time">${escapeHtml(timeAgo(signal.time))}</time>
+              <section>
+                <div class="feed-message">${signalBadge(signal.side)} <strong>${escapeHtml(signal.symbol)}</strong> ${escapeHtml(signal.message)}</div>
+                <div class="tag-row">
+                  ${tierBadge(signal.conviction)}
+                  ${(signal.tags || []).slice(0, 5).map((tag) => `<span class="tag">${escapeHtml(tag)}</span>`).join("")}
+                </div>
+              </section>
+            </article>
+          `).join("")}</section>`;
+        }, () => !signals.length, "Signal feed is quiet", "No execution alerts are available for the current session.");
+
+        DOM.workspace.innerHTML = `
+          <section class="workspace-inner">
+            ${metrics}
+            ${section("Portfolio", "sortable live marks", portfolioBody, "span-8")}
+            ${section("Regime Sizing Note", "risk overlay", sizingBody, "span-4")}
+            ${section("Recent Signals", "mission-control feed", signalsBody, "span-12")}
+          </section>
+        `;
+      }
+
+      function renderEodPredictions() {
+        const predictions = normalizeArray("predictions");
+        const sectors = ["ALL", ...new Set(predictions.map((item) => item.sector).filter(Boolean))].sort();
+        const filtered = predictions.filter((item) => {
+          if (AppState.filters.predictionsSignal !== "ALL" && item.signal !== AppState.filters.predictionsSignal) return false;
+          if (AppState.filters.predictionsTier !== "ALL" && item.tier !== AppState.filters.predictionsTier) return false;
+          if (AppState.filters.predictionsSector !== "ALL" && item.sector !== AppState.filters.predictionsSector) return false;
+          const confidence = normalizedPercent(item.confidence);
+          if (AppState.filters.predictionsConfidence === "70" && confidence < 70) return false;
+          if (AppState.filters.predictionsConfidence === "60" && confidence < 60) return false;
+          return true;
+        });
+        const buys = predictions.filter((item) => item.signal === "BUY").length;
+        const sells = predictions.filter((item) => item.signal === "SELL").length;
+        const holds = predictions.filter((item) => item.signal === "HOLD").length;
+        const avgReturn = predictions.length ? predictions.reduce((sum, item) => sum + numeric(item.expected_return_pct), 0) / predictions.length : 0;
+        const highConfidence = predictions.filter((item) => normalizedPercent(item.confidence) >= 70).length;
+
+        const summary = `
+          <section class="metric-grid">
+            ${metricCard("Universe", predictions.length.toLocaleString("en-IN"), "symbols scored", "", predictions.length)}
+            ${metricCard("BUY", buys.toLocaleString("en-IN"), "long candidates", "positive", buys)}
+            ${metricCard("HOLD", holds.toLocaleString("en-IN"), "neutral candidates", "neutral", holds)}
+            ${metricCard("SELL", sells.toLocaleString("en-IN"), "short candidates", "negative", sells)}
+            ${metricCard("Avg Return", formatPercent(avgReturn), "expected close delta", pnlColor(avgReturn), avgReturn, "percent")}
+            ${metricCard("High Conf", highConfidence.toLocaleString("en-IN"), "confidence >= 70", "", highConfidence)}
+          </section>
+        `;
+
+        const controls = `
+          <section class="toolbar" aria-label="Prediction filters">
+            ${selectHtml("predictionsSignal", ["ALL", "BUY", "HOLD", "SELL"], AppState.filters.predictionsSignal)}
+            ${selectHtml("predictionsConfidence", [["ALL", "ALL CONF"], ["70", "CONF >= 70"], ["60", "CONF >= 60"]], AppState.filters.predictionsConfidence)}
+            ${selectHtml("predictionsTier", ["ALL", "HIGH_CONVICTION", "MODERATE", "SPECULATIVE"], AppState.filters.predictionsTier)}
+            ${selectHtml("predictionsSector", sectors, AppState.filters.predictionsSector)}
+          </section>
+        `;
+
+        const tableBody = resourceGate(["predictions"], () => renderTable({
+          sortId: "predictions",
+          rows: sortRows(filtered, "predictions"),
+          rowClass: (row) => row.signal === "BUY" ? "row-buy" : row.signal === "SELL" ? "row-sell" : "row-warn",
+          columns: [
+            { key: "symbol", label: "Symbol", render: (v) => `<strong>${escapeHtml(v)}</strong>` },
+            { key: "sector", label: "Sector" },
+            { key: "signal", label: "Signal", render: signalBadge },
+            { key: "tier", label: "Tier", render: tierBadge },
+            { key: "last_close", label: "Last", align: "right", render: formatCurrency },
+            { key: "predicted_close", label: "Pred", align: "right", render: formatCurrency },
+            { key: "expected_return_pct", label: "Exp Ret", align: "right", render: (v) => `<span class="${pnlColor(v)}">${formatPercent(numeric(v))}</span>` },
+            { key: "confidence", label: "Conf", align: "right", render: (v) => formatRatioPercent(v, 0) },
+            { key: "win_rate", label: "Win Rate", align: "right", render: (v) => formatRatioPercent(v, 0) },
+            { key: "risk_score", label: "Risk", align: "right", render: (v) => numeric(v).toFixed(2) },
+            { key: "rr_ratio", label: "R:R", align: "right", render: (v) => numeric(v).toFixed(2) },
+            { key: "pattern_names", label: "Patterns", sort: false, render: (v) => (v || []).slice(0, 3).map((name) => `<span class="tag">${escapeHtml(name)}</span>`).join(" ") || "--" }
+          ],
+          emptyTitle: "No predictions match",
+          emptyCopy: "The current filters removed all EOD candidates."
+        }), () => !predictions.length, "No EOD predictions", "The prediction service returned an empty universe.");
+
+        const spotlightBody = resourceGate(["predictions"], () => {
+          const topBuys = [...predictions]
+            .filter((item) => item.signal === "BUY")
+            .sort((a, b) => normalizedPercent(b.confidence) - normalizedPercent(a.confidence) || numeric(b.expected_return_pct) - numeric(a.expected_return_pct))
+            .slice(0, 5);
+          if (!topBuys.length) return emptyState("No BUY spotlight", "No BUY signals are present in the latest EOD prediction set.");
+          return `<section class="spotlight-grid">${topBuys.map((item) => `
+            <article class="spotlight-card">
+              <div class="spotlight-top">
+                <span class="symbol">${escapeHtml(item.symbol)}</span>
+                ${signalBadge(item.signal)}
+              </div>
+              <div class="small-stat-grid">
+                <div class="small-stat"><span class="label">Return</span><span class="${pnlColor(item.expected_return_pct)}">${formatPercent(numeric(item.expected_return_pct))}</span></div>
+                <div class="small-stat"><span class="label">Confidence</span><span>${formatRatioPercent(item.confidence, 0)}</span></div>
+                <div class="small-stat"><span class="label">Risk</span><span>${numeric(item.risk_score).toFixed(2)}</span></div>
+                <div class="small-stat"><span class="label">R:R</span><span>${numeric(item.rr_ratio).toFixed(2)}</span></div>
+              </div>
+              <div class="tag-row">${(item.pattern_names || []).slice(0, 3).map((name) => `<span class="tag">${escapeHtml(name)}</span>`).join("")}</div>
+            </article>
+          `).join("")}</section>`;
+        }, () => !predictions.length, "No spotlight candidates", "EOD prediction output is empty.");
+
+        DOM.workspace.innerHTML = `
+          <section class="workspace-inner">
+            ${summary}
+            ${section("Signal Distribution", "BUY / HOLD / SELL", `<div class="chart-frame compact"><canvas id="signalDistributionChart"></canvas></div>`, "span-4")}
+            ${section("Prediction Filters", "state preserved", controls, "span-8")}
+            ${section("Top BUY Spotlight", "highest confidence", spotlightBody, "span-12")}
+            ${section("Predictions", `${filtered.length} rows`, tableBody, "span-12")}
+          </section>
+        `;
+
+        if (predictions.length) {
+          ChartManager.render("signalDistributionChart", {
+            type: "doughnut",
+            data: {
+              labels: ["BUY", "HOLD", "SELL"],
+              datasets: [{ data: [buys, holds, sells], borderWidth: 1, borderColor: "#050914", backgroundColor: ["#00e676", "#ffd166", "#ff3d6b"] }]
+            },
+            options: ChartManager.baseOptions({
+              cutout: "72%",
+              scales: {},
+              plugins: { ...ChartManager.baseOptions().plugins, legend: { position: "bottom", labels: ChartManager.baseOptions().plugins.legend.labels } }
+            })
+          });
+        }
+      }
+
+      function renderWatchlistPatterns() {
+        const watchlist = normalizeArray("watchlist");
+        const patterns = normalizeArray("patterns");
+        const sources = ["ALL", ...new Set(watchlist.map((item) => item.source).filter(Boolean))].sort();
+        const filteredWatchlist = watchlist.filter((item) => AppState.filters.watchlistSource === "ALL" || item.source === AppState.filters.watchlistSource);
+        const patternFrequency = patterns.reduce((acc, item) => {
+          (item.patterns || []).forEach((name) => { acc[name] = (acc[name] || 0) + 1; });
+          return acc;
+        }, {});
+        const sourceCounts = watchlist.reduce((acc, item) => {
+          acc[item.source || "UNKNOWN"] = (acc[item.source || "UNKNOWN"] || 0) + 1;
+          return acc;
+        }, {});
+
+        const controls = `<section class="toolbar">${selectHtml("watchlistSource", sources, AppState.filters.watchlistSource)}</section>`;
+        const sourceBody = resourceGate(["watchlist"], () => `<div class="chart-frame compact"><canvas id="sourceBreakdownChart"></canvas></div>`, () => !watchlist.length, "No watchlist sources", "The watchlist service returned no ranked candidates.");
+        const momentumBody = resourceGate(["watchlist"], () => `<div class="chart-frame"><canvas id="momentumChart"></canvas></div>`, () => !watchlist.length, "Momentum unavailable", "No watchlist candidates are available for momentum visualization.");
+        const frequencyBody = resourceGate(["patterns"], () => `<div class="chart-frame"><canvas id="patternFrequencyChart"></canvas></div>`, () => !patterns.length, "No detected patterns", "The pattern service returned an empty result set.");
+        const qualityBody = resourceGate(["patterns"], () => {
+          const rows = sortRows(patterns.map((item) => ({ ...item, quality: numeric(item.quality) })), "patterns").slice(0, 12);
+          return `<section class="micro-list">${rows.map((item) => `
+            <article class="micro-row">
+              <section>
+                <strong>${escapeHtml(item.symbol)}</strong>
+                <div class="tag-row">${(item.patterns || []).slice(0, 4).map((name) => `<span class="tag">${escapeHtml(name)}</span>`).join("")}</div>
+                <div class="quality-bar"><div class="quality-fill" style="width:${clamp(numeric(item.quality))}%"></div></div>
+              </section>
+              <section class="right">
+                ${tierBadge(item.tier)}
+                <div class="metric-foot">${numeric(item.quality).toFixed(0)} quality</div>
+              </section>
+            </article>
+          `).join("")}</section>`;
+        }, () => !patterns.length, "Pattern quality pending", "Pattern scoring is empty for this cycle.");
+
+        const tableBody = resourceGate(["watchlist"], () => renderTable({
+          sortId: "watchlist",
+          rows: sortRows(filteredWatchlist, "watchlist"),
+          columns: [
+            { key: "symbol", label: "Symbol", render: (v) => `<strong>${escapeHtml(v)}</strong>` },
+            { key: "score", label: "Score", align: "right", render: (v) => numeric(v).toFixed(2) },
+            { key: "source", label: "Source" },
+            { key: "volume_ratio", label: "Vol Ratio", align: "right", render: (v) => `${numeric(v).toFixed(2)}x` },
+            { key: "return_5d", label: "5D Return", align: "right", render: (v) => `<span class="${pnlColor(v)}">${formatPercent(numeric(v))}</span>` },
+            { key: "liquidity_score", label: "Liquidity", align: "right", render: (v) => numeric(v).toFixed(2) }
+          ],
+          emptyTitle: "No watchlist rows",
+          emptyCopy: "No ranked symbols match the selected source filter."
+        }), () => !watchlist.length, "Watchlist is empty", "No ranked candidates were returned by the watchlist service.");
+
+        DOM.workspace.innerHTML = `
+          <section class="workspace-inner">
+            ${section("Source Breakdown", `${watchlist.length} symbols`, sourceBody, "span-4")}
+            ${section("Watchlist Filter", "source control", controls, "span-8")}
+            ${section("Top Ranked Watchlist", `${filteredWatchlist.length} rows`, tableBody, "span-7")}
+            ${section("Pattern Quality", "ranked confirmation", qualityBody, "span-5")}
+            ${section("Momentum Visualization", "5D return and volume", momentumBody, "span-6")}
+            ${section("Pattern Frequency", "setup distribution", frequencyBody, "span-6")}
+          </section>
+        `;
+
+        if (watchlist.length) {
+          ChartManager.render("sourceBreakdownChart", {
+            type: "bar",
+            data: {
+              labels: Object.keys(sourceCounts),
+              datasets: [{ data: Object.values(sourceCounts), backgroundColor: "rgba(0,212,255,0.28)", borderColor: "#00d4ff", borderWidth: 1 }]
+            },
+            options: ChartManager.baseOptions({ plugins: { ...ChartManager.baseOptions().plugins, legend: { display: false } } })
+          });
+
+          const topMomentum = [...watchlist].sort((a, b) => numeric(b.score) - numeric(a.score)).slice(0, 12);
+          ChartManager.render("momentumChart", {
+            type: "bar",
+            data: {
+              labels: topMomentum.map((item) => item.symbol),
+              datasets: [
+                { label: "5D Return", data: topMomentum.map((item) => numeric(item.return_5d)), backgroundColor: topMomentum.map((item) => numeric(item.return_5d) >= 0 ? "rgba(0,230,118,0.34)" : "rgba(255,61,107,0.34)"), borderWidth: 0 },
+                { label: "Volume Ratio", data: topMomentum.map((item) => numeric(item.volume_ratio)), type: "line", tension: 0.28, pointRadius: 2, borderColor: "#00d4ff", borderWidth: 1.5, yAxisID: "y1" }
+              ]
+            },
+            options: ChartManager.baseOptions({
+              scales: {
+                ...ChartManager.baseOptions().scales,
+                y1: { position: "right", grid: { drawOnChartArea: false }, ticks: { color: "#5a7a96", font: { family: "Space Mono", size: 10 } } }
+              }
+            })
+          });
+        }
+
+        if (patterns.length) {
+          const topPatterns = Object.entries(patternFrequency).sort((a, b) => b[1] - a[1]).slice(0, 10);
+          ChartManager.render("patternFrequencyChart", {
+            type: "bar",
+            data: {
+              labels: topPatterns.map(([name]) => name),
+              datasets: [{ data: topPatterns.map(([, value]) => value), backgroundColor: "rgba(255,209,102,0.25)", borderColor: "#ffd166", borderWidth: 1 }]
+            },
+            options: ChartManager.baseOptions({
+              indexAxis: "y",
+              plugins: { ...ChartManager.baseOptions().plugins, legend: { display: false } }
+            })
+          });
+        }
+      }
+
+      function renderRegimeContext() {
+        const regime = getResource("regime").data || {};
+        const body = resourceGate(["regime"], () => {
+          const cards = [
+            ["Trend", regime.trend],
+            ["Volatility", regime.vol],
+            ["Breadth", regime.breadth],
+            ["Liquidity", regime.liquidity]
+          ].map(([label, value]) => `
+            <article class="regime-card">
+              <span class="label">${label}</span>
+              <strong class="regime-value">${escapeHtml(value || "--")}</strong>
+            </article>
+          `).join("");
+          return `<section class="quad-grid">${cards}</section>`;
+        }, () => !regime.trend && !regime.vol && !regime.breadth && !regime.liquidity, "Regime not published", "The macro regime endpoint returned no active classification.");
+
+        const playbookBody = resourceGate(["regime"], () => {
+          const playbook = regime.playbook || {};
+          return `
+            <section class="playbook">
+              <article class="playbook-primary">
+                <span class="label">Primary Bias</span>
+                <strong class="regime-value">${escapeHtml(playbook.bias || "--")}</strong>
+                <span class="metric-foot">Size ${numeric(playbook.size_multiplier, 1).toFixed(2)}x / stop ${numeric(playbook.stop_multiplier, 1).toFixed(2)}x</span>
+              </article>
+              <section class="playbook-list">
+                <div class="rule-row"><span class="label">Preferred Setups</span><span>${(playbook.preferred_setups || []).map(escapeHtml).join(", ") || "--"}</span></div>
+                <div class="rule-row"><span class="label">Avoid Setups</span><span>${(playbook.avoid_setups || []).map(escapeHtml).join(", ") || "--"}</span></div>
+                <div class="rule-row"><span class="label">Execution Posture</span><span>${playbook.bias === "LONG" ? "Buy pullbacks and add only after breadth confirmation." : playbook.bias === "SHORT" ? "Reduce gross long exposure and respect failed breakouts." : "Keep gross exposure constrained until trend confirmation."}</span></div>
+              </section>
+            </section>
+          `;
+        }, () => !regime.playbook, "No playbook available", "Regime state exists, but tactical playbook fields are empty.");
+
+        const globalRows = Object.entries(regime.global_context || {}).map(([name, item]) => ({ name, ...item }));
+        const globalBody = resourceGate(["regime"], () => renderTable({
+          sortId: "global",
+          rows: sortRows(globalRows, "global"),
+          columns: [
+            { key: "name", label: "Instrument", render: (v) => `<strong>${escapeHtml(v)}</strong>` },
+            { key: "value", label: "Value", align: "right", render: (v) => compactNumber(v) },
+            { key: "change_pct", label: "Change", align: "right", render: (v) => `<span class="${pnlColor(v)}">${formatPercent(numeric(v))}</span>` }
+          ]
+        }), () => !globalRows.length, "Global context empty", "No cross-asset context was returned for this cycle.");
+
+        const sectorBody = resourceGate(["regime"], () => `<div class="chart-frame"><canvas id="sectorRotationChart"></canvas></div>`, () => !Object.keys(regime.sector_returns || {}).length, "Sector rotation unavailable", "Sector returns are not available in the latest regime payload.");
+
+        DOM.workspace.innerHTML = `
+          <section class="workspace-inner">
+            ${section("Regime State", "macro classification", body, "span-12")}
+            ${section("Regime Playbook", "positioning rules", playbookBody, "span-7")}
+            ${section("Global Context", "cross-asset marks", globalBody, "span-5")}
+            ${section("Sector Rotation", "relative return map", sectorBody, "span-12")}
+          </section>
+        `;
+
+        const sectors = Object.entries(regime.sector_returns || {}).sort((a, b) => numeric(b[1]) - numeric(a[1]));
+        if (sectors.length) {
+          ChartManager.render("sectorRotationChart", {
+            type: "bar",
+            data: {
+              labels: sectors.map(([name]) => name),
+              datasets: [{ data: sectors.map(([, value]) => numeric(value)), backgroundColor: sectors.map(([, value]) => numeric(value) >= 0 ? "rgba(0,230,118,0.32)" : "rgba(255,61,107,0.32)"), borderColor: sectors.map(([, value]) => numeric(value) >= 0 ? "#00e676" : "#ff3d6b"), borderWidth: 1 }]
+            },
+            options: ChartManager.baseOptions({ plugins: { ...ChartManager.baseOptions().plugins, legend: { display: false } } })
+          });
+        }
+      }
+
+      function renderIntradayScanner() {
+        const alerts = normalizeArray("alerts");
+        const filtered = alerts.filter((alert) => AppState.filters.alertTier === "ALL" || String(alert.tier) === AppState.filters.alertTier);
+        const controls = `<section class="toolbar">${selectHtml("alertTier", [["ALL", "ALL TIERS"], ["1", "TIER 1"], ["2", "TIER 2"], ["3", "TIER 3"]], AppState.filters.alertTier)}</section>`;
+
+        const body = resourceGate(["alerts"], () => {
+          const groups = [1, 2, 3].map((tier) => {
+            const rows = filtered.filter((alert) => numeric(alert.tier) === tier).sort((a, b) => numeric(b.score) - numeric(a.score));
+            return `
+              <section class="alert-column">
+                <header class="panel-header" style="min-height:40px"><h2 class="panel-title">Tier ${tier}</h2><span class="panel-meta">${rows.length} alerts</span></header>
+                ${rows.length ? rows.map((alert) => alertCard(alert)).join("") : emptyState(`No Tier ${tier} alerts`, "No alerts currently satisfy this tier.")}
+              </section>
+            `;
+          }).join("");
+          return `<section class="alert-grid">${groups}</section>`;
+        }, () => !alerts.length, "Scanner is quiet", "No intraday execution alerts are active right now.");
+
+        DOM.workspace.innerHTML = `
+          <section class="workspace-inner">
+            ${section("Scanner Controls", `${filtered.length} active`, controls, "span-12")}
+            ${section("Intraday Scanner", "execution alert tiers", body, "span-12")}
+          </section>
+        `;
+      }
+
+      function alertCard(alert) {
+        return `
+          <article class="alert-card tier-${escapeHtml(alert.tier)}">
+            <div class="alert-top">
+              <span class="symbol">${escapeHtml(alert.symbol)}</span>
+              <span class="badge tier-${escapeHtml(alert.tier)}">Tier ${escapeHtml(alert.tier)}</span>
+            </div>
+            <p class="feed-message" style="margin:12px 0 0">${escapeHtml(alert.message)}</p>
+            <div class="small-stat-grid">
+              <div class="small-stat"><span class="label">Score</span><span>${numeric(alert.score).toFixed(2)}</span></div>
+              <div class="small-stat"><span class="label">R:R</span><span>${numeric(alert.rr_ratio).toFixed(2)}</span></div>
+              <div class="small-stat"><span class="label">Entry</span><span>${escapeHtml(alert.entry_zone || "--")}</span></div>
+              <div class="small-stat"><span class="label">Stop</span><span>${formatCurrency(alert.stop_loss)}</span></div>
+              <div class="small-stat"><span class="label">Target</span><span>${formatCurrency(alert.target)}</span></div>
+              <div class="small-stat"><span class="label">Time</span><span>${escapeHtml(timeAgo(alert.time))}</span></div>
+            </div>
+            <div class="tag-row">${(alert.tags || []).slice(0, 5).map((tag) => `<span class="tag">${escapeHtml(tag)}</span>`).join("")}</div>
+          </article>
+        `;
+      }
+
+      function renderPerformance() {
+        const performance = getResource("performance").data || {};
+        const history = Array.isArray(performance.daily_history) ? performance.daily_history : [];
+        const symbolRows = Object.entries(performance.symbol_performance || {}).map(([symbol, item]) => ({ symbol, ...item }));
+        const eodRows = Object.entries(performance.eod_accuracy || {}).map(([symbol, item]) => ({ symbol, ...item }));
+        const latest = history.at(-1) || {};
+        const totalPnl = numeric(latest.cum_pnl, history.reduce((sum, item) => sum + numeric(item.pnl), 0));
+        const avgWinRate = history.length ? history.reduce((sum, item) => sum + normalizedPercent(item.win_rate), 0) / history.length : 0;
+        const bestDay = history.reduce((best, item) => numeric(item.pnl) > numeric(best.pnl) ? item : best, { pnl: 0 });
+        const worstDay = history.reduce((worst, item) => numeric(item.pnl) < numeric(worst.pnl) ? item : worst, { pnl: 0 });
+
+        const summary = `
+          <section class="metric-grid">
+            ${metricCard("Cumulative P&L", formatCurrency(totalPnl), "since history start", pnlColor(totalPnl), totalPnl, "currency")}
+            ${metricCard("Trades", compactNumber(history.reduce((sum, item) => sum + numeric(item.trades), 0)), "logged in daily history")}
+            ${metricCard("Avg Win Rate", formatRatioPercent(avgWinRate), "daily mean", avgWinRate >= 50 ? "positive" : "neutral")}
+            ${metricCard("Best Day", formatCurrency(bestDay.pnl), bestDay.date || "no date", "positive", numeric(bestDay.pnl), "currency")}
+            ${metricCard("Worst Day", formatCurrency(worstDay.pnl), worstDay.date || "no date", "negative", numeric(worstDay.pnl), "currency")}
+            ${metricCard("Model Count", symbolRows.length.toLocaleString("en-IN"), "symbols tracked", "", symbolRows.length)}
+          </section>
+        `;
+
+        const modelBody = resourceGate(["performance"], () => renderTable({
+          sortId: "performanceSymbols",
+          rows: sortRows(symbolRows, "performanceSymbols"),
+          columns: [
+            { key: "symbol", label: "Symbol", render: (v) => `<strong>${escapeHtml(v)}</strong>` },
+            { key: "win_rate_20d", label: "20D WR", align: "right", render: (v) => formatRatioPercent(v) },
+            { key: "ic_20d", label: "20D IC", align: "right", render: (v) => numeric(v).toFixed(3) },
+            { key: "sharpe_90d", label: "90D Sharpe", align: "right", render: (v) => numeric(v).toFixed(2) },
+            { key: "status", label: "Status", render: (v) => `<span class="badge ${String(v).toLowerCase()}">${escapeHtml(v)}</span>` },
+            { key: "feature_drift", label: "Drift", align: "right", render: (v) => driftBadge(v) }
+          ],
+          emptyTitle: "No model performance",
+          emptyCopy: "Symbol-level performance has not been published."
+        }), () => !symbolRows.length, "No model performance", "The performance API returned no symbol-level metrics.");
+
+        const accuracyBody = resourceGate(["performance"], () => renderTable({
+          sortId: "eodAccuracy",
+          rows: sortRows(eodRows, "eodAccuracy"),
+          rowClass: (row) => row.degraded ? "row-sell" : "",
+          columns: [
+            { key: "symbol", label: "Symbol", render: (v) => `<strong>${escapeHtml(v)}</strong>` },
+            { key: "hit_rate", label: "Hit Rate", align: "right", render: (v) => formatRatioPercent(v) },
+            { key: "conf_calibration", label: "Calibration", align: "right", render: (v) => numeric(v).toFixed(2) },
+            { key: "total_predictions", label: "Total", align: "right" },
+            { key: "last_20_wr", label: "Last 20 WR", align: "right", render: (v) => formatRatioPercent(v) },
+            { key: "degraded", label: "Degraded", render: (v) => v ? `<span class="badge sell">YES</span>` : `<span class="badge buy">NO</span>` }
+          ],
+          emptyTitle: "No EOD accuracy",
+          emptyCopy: "EOD prediction accuracy has not been published."
+        }), () => !eodRows.length, "No EOD accuracy", "Prediction accuracy metrics are empty.");
+
+        const pnlChart = resourceGate(["performance"], () => `<div class="chart-frame"><canvas id="cumPnlChart"></canvas></div>`, () => !history.length, "No P&L history", "Daily performance history is empty.");
+        const dailyChart = resourceGate(["performance"], () => `<div class="chart-frame"><canvas id="dailyPnlChart"></canvas></div>`, () => !history.length, "No daily bars", "Daily P&L bars require performance history.");
+
+        DOM.workspace.innerHTML = `
+          <section class="workspace-inner">
+            ${summary}
+            ${section("Cumulative P&L", "equity curve", pnlChart, "span-6")}
+            ${section("Daily P&L", "session distribution", dailyChart, "span-6")}
+            ${section("Model Performance", `${symbolRows.length} symbols`, modelBody, "span-7")}
+            ${section("EOD Prediction Accuracy", `${eodRows.length} symbols`, accuracyBody, "span-5")}
+          </section>
+        `;
+
+        if (history.length) {
+          ChartManager.render("cumPnlChart", {
+            type: "line",
+            data: {
+              labels: history.map((item) => item.date),
+              datasets: [{ label: "Cum P&L", data: history.map((item) => numeric(item.cum_pnl)), borderColor: "#00d4ff", backgroundColor: "rgba(0,212,255,0.08)", borderWidth: 1.5, pointRadius: 0, tension: 0.22, fill: true }]
+            },
+            options: ChartManager.baseOptions()
+          });
+          ChartManager.render("dailyPnlChart", {
+            type: "bar",
+            data: {
+              labels: history.map((item) => item.date),
+              datasets: [{ label: "Daily P&L", data: history.map((item) => numeric(item.pnl)), backgroundColor: history.map((item) => numeric(item.pnl) >= 0 ? "rgba(0,230,118,0.34)" : "rgba(255,61,107,0.34)"), borderWidth: 0 }]
+            },
+            options: ChartManager.baseOptions()
+          });
+        }
+      }
+
+      function driftBadge(value) {
+        const n = numeric(value);
+        const cls = n > 0.65 ? "sell" : n > 0.35 ? "hold" : "buy";
+        return `<span class="badge ${cls}">${n.toFixed(2)}</span>`;
+      }
+
+      function selectHtml(name, options, value) {
+        const html = options.map((option) => {
+          const optionValue = Array.isArray(option) ? option[0] : option;
+          const label = Array.isArray(option) ? option[1] : option;
+          return `<option value="${escapeHtml(optionValue)}" ${String(optionValue) === String(value) ? "selected" : ""}>${escapeHtml(label)}</option>`;
+        }).join("");
+        return `<select class="select-control" data-filter="${escapeHtml(name)}" aria-label="${escapeHtml(name)}">${html}</select>`;
+      }
+
+      function handleSort(target) {
+        const sortId = target.dataset.sortId;
+        const key = target.dataset.sortKey;
+        if (!sortId || !key || !AppState.sorts[sortId]) return;
+        const sort = AppState.sorts[sortId];
+        if (sort.key === key) sort.direction = sort.direction === "asc" ? "desc" : "asc";
+        else {
+          sort.key = key;
+          sort.direction = "desc";
+        }
+        renderActiveTab();
+      }
+
+      async function retryKeys(keys) {
+        renderTabShell();
+        await loadResources(keys, { soft: false });
+        await loadResources(TAB_REQUIREMENTS[AppState.activeTab], { soft: true });
+        renderActiveTab();
+      }
+
+      function registerEvents() {
+        DOM.nav.addEventListener("click", (event) => {
+          const button = event.target.closest("[data-tab]");
+          if (!button) return;
+          selectTab(button.dataset.tab);
+        });
+
+        DOM.nav.addEventListener("keydown", (event) => {
+          if (!["ArrowRight", "ArrowLeft", "Home", "End"].includes(event.key)) return;
+          const buttons = [...DOM.nav.querySelectorAll("[data-tab]")];
+          const current = buttons.findIndex((button) => button.dataset.tab === AppState.activeTab);
+          let next = current;
+          if (event.key === "ArrowRight") next = (current + 1) % buttons.length;
+          if (event.key === "ArrowLeft") next = (current - 1 + buttons.length) % buttons.length;
+          if (event.key === "Home") next = 0;
+          if (event.key === "End") next = buttons.length - 1;
+          event.preventDefault();
+          buttons[next].focus();
+          selectTab(buttons[next].dataset.tab);
+        });
+
+        DOM.workspace.addEventListener("click", (event) => {
+          const retry = event.target.closest("[data-action='retry']");
+          if (retry) {
+            retryKeys(retry.dataset.keys.split(",").filter(Boolean));
+            return;
+          }
+          const sortHeader = event.target.closest("[data-sort-key]");
+          if (sortHeader) handleSort(sortHeader);
+        });
+
+        DOM.workspace.addEventListener("change", (event) => {
+          const control = event.target.closest("[data-filter]");
+          if (!control) return;
+          AppState.filters[control.dataset.filter] = control.value;
+          renderActiveTab();
+        });
+      }
+
+      function startScheduler() {
+        if (AppState.scheduler.intervalId) window.clearInterval(AppState.scheduler.intervalId);
+        if (AppState.scheduler.countdownId) window.clearInterval(AppState.scheduler.countdownId);
+
+        AppState.scheduler.countdownId = window.setInterval(() => {
+          AppState.scheduler.countdown = AppState.scheduler.countdown <= 1 ? 30 : AppState.scheduler.countdown - 1;
+          renderChrome();
+        }, 1000);
+
+        AppState.scheduler.intervalId = window.setInterval(async () => {
+          if (AppState.scheduler.refreshing) return;
+          AppState.scheduler.refreshing = true;
+          AppState.scheduler.countdown = 30;
+          await loadResources(["status", ...TAB_REQUIREMENTS[AppState.activeTab]], { soft: true });
+          renderActiveTab();
+          AppState.scheduler.refreshing = false;
+        }, 30000);
+      }
+
+      async function init() {
+        registerEvents();
+        startScheduler();
+        renderChrome();
+        await loadResource("status");
+        renderChrome();
+        await selectTab("live");
+      }
+
+      init();
+    })();
+  </script>
+</body>
+</html>

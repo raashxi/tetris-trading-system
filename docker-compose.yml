@@ -1,0 +1,72 @@
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: trading_bot_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  bot:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    container_name: trading_bot_main
+    env_file:
+      - .env
+    volumes:
+      - ./src:/app/src
+      - ./config:/app/config
+      - ./logs:/app/logs
+      - ./models:/app/models
+      - ./data:/app/data
+      - ~/.tetris:/home/botuser/.trading_bot 
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    command: python src/main.py
+  
+  dashboard:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    container_name: trading_bot_dashboard
+    env_file:
+      - .env
+    ports:
+      - "8501:8501"
+    volumes:
+      - ./src:/app/src
+      - ./config:/app/config
+      - ./logs:/app/logs
+      - ./models:/app/models
+    depends_on:
+      - bot
+    restart: unless-stopped
+    command: streamlit run src/monitoring/dashboard.py --server.port=8501 --server.address=0.0.0.0
+
+  api:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    container_name: trading_bot_api
+    env_file:
+      - .env
+    ports:
+      - "8502:8502"
+    volumes:
+      - ./src:/app/src
+      - ./logs:/app/logs
+      - ./frontend:/app/frontend
+    command: uvicorn src.api.server:app --host 0.0.0.0 --port 8502
+    restart: unless-stopped
+
+volumes:
+  redis_data:

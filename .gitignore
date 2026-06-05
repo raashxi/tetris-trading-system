@@ -1,0 +1,37 @@
+# Secrets
+.env
+*.key
+*.pem
+*.token
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+
+# Docker
+docker-compose.override.yml
+
+# Logs & Data
+logs/
+data/
+*.log
+
+# Models (too large, can be retrained)
+models/*.pkl
+models/eod/*.pkl
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Backups
+tetris_backups/
+*.bak

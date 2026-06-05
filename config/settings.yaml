@@ -1,0 +1,70 @@
+trading:
+  mode: "PAPER"  # PAPER → SHADOW → LIVE (progression enforced)
+  paper_days_required: 30
+  shadow_days_required: 7
+  max_positions: 5
+  max_sector_concentration: 2
+  daily_loss_limit_pct: 0.02
+  capital_intraday_pct: 0.80
+  risk_per_trade_pct: 0.01
+  stop_loss_atr_multiple: 2.0
+  target1_multiplier: 1.0
+  target2_multiplier: 1.3
+  trailing_stop_atr_multiple: 1.0
+  square_off_time: "15:20"
+  signal_threshold_atr_multiplier: 0.5
+
+models:
+  base_models: ["random_forest", "xgboost", "lstm"]
+  use_gpu: false  # Mac doesn't have NVIDIA GPU for XGBoost
+  retrain_time: "16:00"
+  walk_forward_initial_months: 6
+  walk_forward_step_months: 1
+  min_ic_threshold: 0.03
+  min_sharpe_threshold: 0.5
+  min_win_rate: 0.48
+  optuna_trials: 50
+  lstm_sequence_length: 20
+  online_learning_weight: 0.10
+
+features:
+  timeframes: [1, 5, 15]
+  warmup_bars: 200
+  forward_fill_within_day_only: true
+  
+data:
+  primary_source: "yfinance"  # Changed from nsefeed - more reliable
+  secondary_source: "kite_historical"
+  cache_intraday_ttl_seconds: 300
+  historical_days: 365
+  live_tick_method: "websocket"
+
+risk:
+  india_vix_high_threshold: 25.0
+  vix_high_position_reduction: 0.75
+  correlation_threshold: 0.85
+  max_bid_ask_spread_pct: 0.10
+  vol_percentile_threshold: 90
+  max_gross_exposure_pct: 0.80
+  portfolio_beta_limit: 0.80
+  intraday_drawdown_halt_pct: 0.05
+
+costs:
+  zerodha_intraday_brokerage_pct: 0.0003
+  zerodha_flat_fee_inr: 20
+  stt_intraday_sell_pct: 0.00025
+  nse_transaction_pct: 0.0000297
+  sebi_charges_per_crore: 10
+  gst_on_brokerage_pct: 0.18
+  stamp_duty_buy_pct: 0.00015
+  clearing_charges_pct: 0.000002
+  estimated_slippage_pct: 0.0005
+
+alerts:
+  telegram_enabled: true
+  email_enabled: false
+  alert_on: ["trade_placed", "trade_filled", "stop_hit",
+             "daily_loss_limit", "model_decay", "api_error",
+             "session_expired", "kill_switch_activated",
+             "circuit_breaker", "square_off_complete",
+             "eod_summary"]
