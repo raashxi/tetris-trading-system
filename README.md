@@ -519,6 +519,6 @@ This project is licensed under the **MIT License** — see the [LICENSE](LICENSE
 
 [![Star this repo](https://img.shields.io/github/stars/raashxi/tetris-trading-system?style=social)](https://github.com/raashxi/tetris-trading-system)
 
-*NSE · Zerodha Kite · Python · Docker · Built for the Indian markets*
+*Built for the Indian markets*
 
 </div>
