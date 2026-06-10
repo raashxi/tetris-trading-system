@@ -9,8 +9,8 @@
    ╚═╝   ╚══════╝   ╚═╝   ╚═╝  ╚═╝╚═╝╚══════╝
 ```
 
-### **Multi-Strategy AI Trading System — NSE India**
-*Autonomous · ML-Powered · Institutionally Risk-Managed*
+### **Multi Strategy AI Trading System NSE India**
+*Autonomous · ML Powered · Institutionally Risk Managed*
 
 <br/>
 
@@ -31,7 +31,7 @@
 
 ---
 
-## 📋 Table of Contents
+## Table of Contents
 
 - [Overview](#-overview)
 - [Features](#-features)
@@ -52,11 +52,11 @@
 
 ---
 
-## 🎯 Overview
+## Overview
 
-**TETRIS** is a fully autonomous, AI-driven algorithmic trading system engineered for the Indian stock market (NSE). It combines machine learning ensembles with battle-tested rule-based strategies to trade 50 Nifty stocks across multiple time horizons — all guarded by institutional-grade risk controls.
+**TETRIS** is a fully autonomous, AI driven algorithmic trading system engineered for the Indian stock market (NSE). It combines machine learning ensembles with battle tested rule based strategies to trade 50 Nifty stocks across multiple time horizons all guarded by institutional grade risk controls.
 
-The system runs 4 containerized microservices via Docker Compose, exposes 12+ REST endpoints via FastAPI, and delivers a 6-tab premium dashboard with real-time P&L, signals, regime analysis, and model performance — with Telegram alerts and automated PDF reports.
+The system runs 4 containerized microservices via Docker Compose, exposes 12+ REST endpoints via FastAPI, and delivers a 6 tab premium dashboard with realtime P&L, signals, regime analysis, and model performance with Telegram alerts and automated PDF reports.
 
 > Currently deployed in **paper trading mode** via Zerodha Kite Connect API.
 
@@ -66,39 +66,39 @@ ML Ensemble + Rule-Based Strategies → Microstructure Filter → Risk Engine �
 
 ---
 
-## ✨ Features
+## Features
 
-### 🤖 Machine Learning
-- **Dual-horizon ML ensemble** — 60-min intraday predictions + next-day EOD forecasts
+### Machine Learning
+- **Dual horizon ML ensemble** 60-min intraday predictions + nextday EOD(End of the day)forecasts
 - **65+ engineered technical features** with strict lookahead prevention
-- **Walk-forward validation** with purge-embargo gaps for realistic backtesting
+- **Walk-forward validation** with purge embargo gaps for realistic backtesting
 - **Hyperparameter optimization** via Optuna (50+ trials per model)
-- **Automated daily retraining** — models stay fresh without manual intervention
+- **Automated daily retraining** models stay fresh without manual intervention
 
-### 📈 Trading Strategies
-- **Intraday ML (60-min)** — RF + XGBoost + LSTM ensemble for moves >0.25%
-- **EOD Predictions** — Daily RF + XGBoost classifier for directional moves >0.5%
-- **Mean Reversion** — RSI + VWAP rule-based, targets +1% recovery in 10–45 min
-- **Momentum** — 1–5 day return continuation with RSI confirmation
-- **Microstructure Filter** — Order book supply/demand validation on every signal
+### Trading Strategies
+- **Intraday ML (60-min)** RF + XGBoost + LSTM ensemble for moves >0.25%
+- **EOD Predictions** Daily RF + XGBoost classifier for directional moves >0.5%
+- **Mean Reversion** RSI + VWAP rule based, targets +1% recovery in 10–45 min
+- **Momentum** 1–5 day return continuation with RSI confirmation
+- **Microstructure Filter** Order book supply/demand validation on every signal
 
-### 🛡️ Risk Management
-- Half-Kelly position sizing with 1% capital risk per trade
+### Risk Management
+- Half Kelly position sizing with 1% capital risk per trade
 - ATR-based stop losses with trailing logic
 - Circuit breakers, daily loss limits, sector & correlation limits
 - Full details in the [Risk Management](#-risk-management) section
 
-### 🖥️ Infrastructure
-- **6-tab institutional dashboard** with real-time P&L, sparklines, and charts
+### Infrastructure
+- **6 tab institutional dashboard** with real time P&L, sparklines, and charts
 - **12+ REST API endpoints** via FastAPI
 - **Telegram alerts** for signals, exits, and system errors
-- **Automated PDF report** generation post-market
+- **Automated PDF report** generation post market
 - **Docker containerized** with 4 microservices
-- **Persistent Kite session** management with auto-login
+- **Persistent Kite session** management with auto login
 
 ---
 
-## 🏗️ Architecture
+## Architecture
 
 TETRIS runs as **4 microservices** orchestrated via Docker Compose:
 
@@ -106,20 +106,20 @@ TETRIS runs as **4 microservices** orchestrated via Docker Compose:
 ┌─────────────────────────────────────────────────────────────────┐
 │                        TETRIS SYSTEM                            │
 │                                                                 │
-│  ┌──────────────────┐      ┌──────────────────────────────┐    │
-│  │  trading_bot_main │      │      trading_bot_api          │    │
-│  │                  │◄────►│   FastAPI · 12+ endpoints     │    │
-│  │  • Orchestrator   │      │   Port: 8502                  │    │
+│  ┌───────────────────┐      ┌──────────────────────────────┐    │
+│  │  trading_bot_main │      │      trading_bot_api         │    │
+│  │                   │◄────►│   FastAPI · 12+ endpoints    │    │
+│  │  • Orchestrator   │      │   Port: 8502                 │    │
 │  │  • ML Predictions │      └──────────────────────────────┘    │
 │  │  • Order Manager  │                                          │
 │  │  • Risk Engine    │      ┌──────────────────────────────┐    │
-│  │  • Retraining     │◄────►│      trading_bot_redis        │    │
-│  └──────────────────┘      │   Redis · Historical Cache    │    │
+│  │  • Retraining     │◄────►│      trading_bot_redis       │    │
+│  └───────────────────┘      │   Redis · Historical Cache   │    │
 │                             └──────────────────────────────┘    │
 │                                                                 │
 │                             ┌──────────────────────────────┐    │
-│                             │   trading_bot_dashboard       │    │
-│                             │   Streamlit · Port: 8501      │    │
+│                             │   trading_bot_dashboard      │    │
+│                             │          Port: 8501          │    │
 │                             └──────────────────────────────┘    │
 └─────────────────────────────────────────────────────────────────┘
          │                          │
@@ -136,7 +136,7 @@ Market Data → Feature Engineering → ML Ensemble → Microstructure Filter
 
 ---
 
-## 🛠️ Tech Stack
+## Tech Stack
 
 | Layer | Technology | Purpose |
 |---|---|---|
@@ -156,12 +156,12 @@ Market Data → Feature Engineering → ML Ensemble → Microstructure Filter
 
 ---
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 tetris/
 ├── src/
-│   ├── api/                    # FastAPI server — REST endpoints
+│   ├── api/                    # FastAPI server REST endpoints
 │   │   ├── main.py             # App entrypoint, route registration
 │   │   └── routes/             # Modular route handlers
 │   ├── auth/                   # Zerodha Kite session management
@@ -176,8 +176,8 @@ tetris/
 │   │   └── calendar.py         # NSE trading calendar
 │   ├── features/               # Feature engineering (65+ features)
 │   │   ├── technical.py        # RSI, MACD, Bollinger, ATR, VWAP...
-│   │   ├── microstructure.py   # Order book depth, bid-ask spread
-│   │   └── market_relative.py  # Nifty-relative, sector features
+│   │   ├── microstructure.py   # Order book depth, bid ask spread
+│   │   └── market_relative.py  # Nifty relative, sector features
 │   ├── models/                 # ML pipeline
 │   │   ├── trainer.py          # Walk-forward training with embargo
 │   │   ├── predictor.py        # Inference with confidence scoring
@@ -188,7 +188,7 @@ tetris/
 │   │   ├── alerts.py           # Telegram alert dispatcher
 │   │   └── performance.py      # Live P&L, drawdown tracking
 │   ├── risk/                   # Risk management engine
-│   │   ├── position_sizer.py   # Half-Kelly sizing
+│   │   ├── position_sizer.py   # Half Kelly sizing
 │   │   ├── stop_loss.py        # ATR trailing stops
 │   │   └── portfolio.py        # Sector limits, correlation checks
 │   ├── scanner/                # Intraday opportunity scanner
@@ -208,9 +208,9 @@ tetris/
 │   ├── models.yaml             # Feature sets, hyperparameter spaces
 │   └── strategies.yaml         # Entry/exit rules per strategy
 ├── docker/
-│   └── Dockerfile              # Multi-stage Python build
+│   └── Dockerfile              # Multi stage Python build
 ├── frontend/
-│   ├── index.html              # Premium 6-tab dashboard
+│   ├── index.html              # Premium 6 tab dashboard
 │   ├── styles.css              # Dashboard styling
 │   └── charts.js               # Chart.js visualizations
 ├── scripts/
@@ -230,7 +230,7 @@ tetris/
 
 ---
 
-## 🚀 Installation
+## Installation
 
 ### Prerequisites
 
@@ -238,7 +238,7 @@ tetris/
 |---|---|
 | [Docker Desktop](https://www.docker.com/products/docker-desktop/) | v24+ recommended |
 | [Zerodha Kite Connect](https://kite.trade/) | API key + secret |
-| Telegram Bot Token | For real-time alerts — [@BotFather](https://t.me/BotFather) |
+| Telegram Bot Token | For real time alerts [@BotFather](https://t.me/BotFather) |
 | Python 3.11 *(optional)* | For local dev without Docker |
 
 ### Setup
@@ -283,18 +283,18 @@ open http://localhost:8502
 
 ---
 
-## 💻 Usage
+## Usage
 
 ### Daily Operations
 
 ```bash
-# ☀️  Morning — run before 9:15 AM IST
+# Morning run before 9:15 AM IST
 ./scripts/start_tetris.sh
 
-# 📡  During market hours — live monitoring
+# During market hours live monitoring
 ./scripts/watch_tetris.sh
 
-# 🌙  Evening — shutdown, retrain, backup
+# Evening shutdown, retrain, backup
 ./scripts/stop_tetris.sh
 ```
 
@@ -339,7 +339,7 @@ docker-compose run --rm trading_bot_main pytest tests/ --cov=src --cov-report=te
 
 ---
 
-## 📡 API Endpoints
+## API Endpoints
 
 Base URL: `http://localhost:8502/api`
 
@@ -348,7 +348,7 @@ Base URL: `http://localhost:8502/api`
 | `GET` | `/status` | System health, uptime, service status |
 | `GET` | `/positions` | Live open positions with P&L |
 | `GET` | `/signals` | Active trading signals with confidence scores |
-| `GET` | `/eod/predictions` | Next-day predictions for 50 Nifty stocks |
+| `GET` | `/eod/predictions` | Next day predictions for 50 Nifty stocks |
 | `GET` | `/eod/watchlist` | Ranked watchlist with signal filters |
 | `GET` | `/eod/patterns` | Candlestick pattern detections |
 | `GET` | `/eod/accuracy` | Historical model prediction accuracy |
@@ -377,39 +377,39 @@ curl http://localhost:8502/api/status
 
 ---
 
-## 📊 Dashboard
+## Dashboard
 
 Access at **`http://localhost:8502`** · Streamlit backup at **`http://localhost:8501`**
 
 | Tab | Content |
 |---|---|
-| 📈 **Live Trading** | Real-time positions, live P&L, active signals, order book |
-| 🌅 **EOD Predictions** | 50 stocks with confidence bars, directional signals, filters |
-| 🔍 **Watchlist & Patterns** | Ranked watchlist, candlestick pattern detection |
-| 🌍 **Regime & Context** | Market trend, VIX, sector rotation, global macro context |
-| 📡 **Intraday Scanner** | Tiered alerts — volume spikes, breakouts, RSI extremes |
-| 📊 **Performance** | Equity curves, model accuracy, strategy-level analytics |
+| **Live Trading** | Real time positions, live P&L, active signals, order book |
+| **EOD Predictions** | 50 stocks with confidence bars, directional signals, filters |
+| **Watchlist & Patterns** | Ranked watchlist, candlestick pattern detection |
+| **Regime & Context** | Market trend, VIX, sector rotation, global macro context |
+| **Intraday Scanner** | Tiered alerts volume spikes, breakouts, RSI extremes |
+| **Performance** | Equity curves, model accuracy, strategy level analytics |
 
 ---
 
-## 🛡️ Risk Management
+## Risk Management
 
 Every signal clears a full risk waterfall before execution:
 
 ```
-┌─────────────────────────────────────────────────────┐
-│                   RISK WATERFALL                    │
-│                                                     │
-│  1. Microstructure Filter  ← Order book validation  │
-│  2. Correlation Check      ← Reject if r > 0.85     │
-│  3. Sector Limit           ← Max 2 per sector        │
-│  4. Daily Loss Limit       ← Halt at 2% capital      │
-│  5. Intraday Drawdown      ← Halt at 5% drawdown     │
-│  6. Circuit Breaker        ← 3 rejects → 10 min pause│
+┌───────────────────────────────────────────────────────┐
+│                   RISK WATERFALL                      │
+│                                                       │
+│  1. Microstructure Filter  ← Order book validation    │
+│  2. Correlation Check      ← Reject if r > 0.85       │
+│  3. Sector Limit           ← Max 2 per sector         │
+│  4. Daily Loss Limit       ← Halt at 2% capital       │
+│  5. Intraday Drawdown      ← Halt at 5% drawdown      │
+│  6. Circuit Breaker        ← 3 rejects → 10 min pause │
 │  7. Kelly Sizing           ← Half-Kelly, 1% risk/trade│
 │  8. ATR Stop Loss          ← Trailing, auto-adjusted  │
 │  9. Symbol Cooldown        ← Lockout after any exit   │
-└─────────────────────────────────────────────────────┘
+└───────────────────────────────────────────────────────┘
 ```
 
 | Parameter | Value |
@@ -425,11 +425,11 @@ Every signal clears a full risk waterfall before execution:
 
 ---
 
-## 🧠 ML Models
+## ML Models
 
 | Model | Algorithms | Features | Validation Strategy |
 |---|---|---|---|
-| **Intraday (60-min)** | RF + XGBoost + LSTM · Optuna-tuned | 30+ technical indicators, microstructure depth | Purged walk-forward CV with embargo gaps |
+| **Intraday (60-min)** | RF + XGBoost + LSTM · Optuna-tuned | 30+ technical indicators, microstructure depth | Purged walk forward CV with embargo gaps |
 | **EOD (Daily)** | RF + XGBoost Classifier | 35+ daily + market-relative features | Walk-forward with strict lookahead prevention |
 
 **Feature categories:**
@@ -447,18 +447,18 @@ Temporal              →  Time-of-day, day-of-week, expiry proximity
 
 ## 🗺️ Future Roadmap
 
-- [ ] **Options Strategy Layer** — delta-neutral spreads, iron condors
-- [ ] **Paper Trading UI** — simulated P&L with order replay
-- [ ] **Multi-Broker Support** — Fyers, Angel One, Upstox
-- [ ] **Earnings Catalyst Scanner** — NLP-powered event detection
-- [ ] **Backtesting UI** — parameter sweep visualization with equity curves
-- [ ] **Regime-Adaptive Sizing** — volatility-scaled position sizes
-- [ ] **Cloud Deployment** — AWS/GCP with automated market-hours scaling
-- [ ] **Portfolio Optimizer** — mean-variance + Black-Litterman allocation
+- [ ] **Options Strategy Layer** delta-neutral spreads, iron condors
+- [ ] **Paper Trading UI** simulated P&L with order replay
+- [ ] **Multi-Broker Support** Fyers, Angel One, Upstox
+- [ ] **Earnings Catalyst Scanner** NLP-powered event detection
+- [ ] **Backtesting UI** parameter sweep visualization with equity curves
+- [ ] **Regime-Adaptive Sizing** volatility scaled position sizes
+- [ ] **Cloud Deployment** AWS/GCP with automated market-hours scaling
+- [ ] **Portfolio Optimizer** mean-variance + Black-Litterman allocation
 
 ---
 
-## 🤝 Contributing
+## Contributing
 
 Contributions, issues, and feature requests are welcome!
 
@@ -488,7 +488,7 @@ This project is licensed under the **MIT License** — see the [LICENSE](LICENSE
 
 ---
 
-## 👨‍💻 Author
+## Author
 
 <div align="center">
 
@@ -503,11 +503,11 @@ This project is licensed under the **MIT License** — see the [LICENSE](LICENSE
 
 ---
 
-## ⚠️ Disclaimer
+## Disclaimer
 
 > **This software is provided strictly for educational and research purposes only.**
 >
-> Algorithmic trading involves substantial risk of financial loss. Past performance of any strategy — backtested or live — does not guarantee future results. This system is currently configured for **paper trading only** and has not been validated for live capital deployment.
+> Algorithmic trading involves substantial risk of financial loss. Past performance of any strategy backtested or live does not guarantee future results. This system is currently configured for **paper trading only** and has not been validated for live capital deployment.
 >
 > The author assumes no responsibility for financial decisions made using this software. Always validate thoroughly in paper trading mode before considering live deployment. **Trade at your own risk.**
 
