@@ -21,7 +21,7 @@ def main():
         return
 
     # 1. Predictions
-    preds = run_daily_predictions(max_symbols=50)
+    preds = run_daily_predictions(max_symbols=100)
     with open(OUTPUT_DIR / "predictions.json", "w") as f:
         json.dump(preds, f, indent=2)
 

@@ -153,9 +153,8 @@ class PaperBroker(Broker):
         return base * (1.5 if order_type == "MARKET" else 1.0)
 
     def _fill_price(self, symbol: str, side: str, price: float, order_type: str) -> float:
-        def _fill_price(self, symbol: str, side: str, price: float, order_type: str) -> float:
-            if order_type == "MARKET" and price <= 0:
-                return 0.0   # will cause fill_price=0 → status rejection later
+        if order_type == "MARKET" and price <= 0:
+            return 0.0   # will cause fill_price=0 → status rejection later
         ref = self._reference_price(symbol, side, price, order_type)
         if ref <= 0:
             return 0.0

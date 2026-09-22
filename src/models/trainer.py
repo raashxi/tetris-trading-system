@@ -141,7 +141,6 @@ class ModelTrainer:
                 min_samples_leaf=min_samples_leaf,
                 random_state=42,
                 n_jobs=-1,
-                class_weight='balanced'
             )
             model.fit(X_train, y_train)
             preds = model.predict(X_val)
@@ -149,7 +148,7 @@ class ModelTrainer:
         study = optuna.create_study(direction="minimize")
         study.optimize(objective, n_trials=n_trials, show_progress_bar=False)
         best = study.best_params
-        model = RandomForestClassifier(**best, random_state=42, n_jobs=-1, class_weight='balanced')
+        model = RandomForestClassifier(**best, random_state=42, n_jobs=-1)
         model.fit(X_train, y_train)
         return model
 
@@ -166,7 +165,6 @@ class ModelTrainer:
                 "n_estimators": trial.suggest_int("n_estimators", 100, 1000),
                 "verbosity": 0,
                 "tree_method": "hist",
-                "scale_pos_weight": len(y_train[y_train == 0]) / max(len(y_train[y_train == 1]), 1),
             }
             model = xgb.train(params, dtrain, num_boost_round=params["n_estimators"],
                               evals=[(dval, "val")], early_stopping_rounds=30, verbose_eval=False)
@@ -230,15 +228,18 @@ class ModelTrainer:
         model.eval()
         return model
 
-    def _compute_metrics(self, y_true, y_pred) -> Tuple[float, float, float, float]:
+    def _compute_metrics(self, y_true, y_pred, target_returns=None) -> Tuple[float, float, float, float]:
         mae = mean_absolute_error(y_true, y_pred)
         ic = np.corrcoef(y_true, y_pred)[0, 1] if len(y_true) > 1 else 0.0
-        direction_pred = (pd.Series(y_pred) > 0).astype(int)
+        direction_pred = (pd.Series(y_pred) > 0.5).astype(int)
         direction_actual = (pd.Series(y_true) > 0).astype(int)
         wr = (direction_pred == direction_actual).mean()
         # Directional strategy proxy before costs. This is only an approval
         # screen; live use still requires separate cost-adjusted backtests.
-        returns = pd.Series(np.where(direction_pred, y_true, -y_true))  # rough
+        if target_returns is not None and len(target_returns) == len(direction_pred):
+            returns = pd.Series(np.where(direction_pred, target_returns, -target_returns))
+        else:
+            returns = pd.Series(np.where(direction_pred, y_true, -y_true))  # rough
         sharpe = (returns.mean() / returns.std() * np.sqrt(252 * 75)) if returns.std() > 0 else 0.0
         return mae, ic, wr, sharpe
 
@@ -254,10 +255,11 @@ class ModelTrainer:
         step = self.step_days * 75  # approx 75 5-min bars per day
         train_start = self.train_days * 75
         purge = self.purge_days * 75
+        embargo = 18
 
-        all_rf_preds, all_xgb_preds, all_lstm_preds, all_true = [], [], [], []
+        all_rf_preds, all_xgb_preds, all_lstm_preds, all_true, all_target_returns = [], [], [], [], []
 
-        for test_start in range(train_start, n - step, step):
+        for test_start in range(train_start, n - step, step + embargo):
             train_end = test_start - purge
             if train_end <= 0:
                 continue
@@ -272,6 +274,7 @@ class ModelTrainer:
             X_train, y_train, scaler, feature_cols = self._fit_arrays(fit_df)
             X_val, y_val = self._transform_arrays(val_df, scaler, feature_cols)
             X_test, y_test = self._transform_arrays(test_df, scaler, feature_cols)
+            target_returns_test = test_df["target_return"].values
 
             # Tune & train RF
             rf = self._tune_rf(X_train, y_train, X_val, y_val, n_trials=20)
@@ -289,6 +292,7 @@ class ModelTrainer:
             with torch.no_grad():
                 lstm_pred = lstm(torch.tensor(X_seq_test, dtype=torch.float32).to(device)).cpu().numpy()
             all_true.extend(y_test[20:])
+            all_target_returns.extend(target_returns_test[20:])
             all_rf_preds.extend(rf_pred[20:])
             all_xgb_preds.extend(xg_pred[20:])
             all_lstm_preds.extend(lstm_pred)
@@ -299,6 +303,7 @@ class ModelTrainer:
             logger.error(f"Insufficient out-of-sample predictions for {self.symbol}")
             return False
         all_true = np.array(all_true[:min_len])
+        target_returns = np.array(all_target_returns[:min_len])
         rf_preds = np.array(all_rf_preds[:min_len])
         xgb_preds = np.array(all_xgb_preds[:min_len])
         lstm_preds = np.array(all_lstm_preds[:min_len])
@@ -310,10 +315,10 @@ class ModelTrainer:
         final_preds, lower, upper = self.ensemble.predict(base_preds)
 
         # Metrics
-        _, self.ic, self.win_rate, self.sharpe = self._compute_metrics(all_true, final_preds)
+        _, self.ic, self.win_rate, self.sharpe = self._compute_metrics(all_true, final_preds, target_returns=target_returns)
         
         # Additional classification metrics
-        ensemble_pred_binary = (final_preds > 0).astype(int)
+        ensemble_pred_binary = (final_preds > 0.5).astype(int)
         accuracy = accuracy_score(all_true, ensemble_pred_binary)
         f1 = f1_score(all_true, ensemble_pred_binary, zero_division=0)
         balanced_acc = balanced_accuracy_score(all_true, ensemble_pred_binary)
@@ -385,6 +390,7 @@ class ModelTrainer:
         self.xgb_model = data["xgb"]
         self.lstm_model = LSTMRegressor(len(data["feature_cols"])).to(device)
         self.lstm_model.load_state_dict(data["lstm_state"])
+        self.lstm_model.eval()
         self.scaler = data["scaler"]
         self.feature_cols = data["feature_cols"]
         self.ensemble = data["ensemble"]
@@ -405,10 +411,9 @@ def train_all(active_only: bool = True, max_symbols: int = 10) -> Dict[str, bool
     Returns:
         Dict mapping symbol to success/failure
     """
-    from src.data.fetcher import NIFTY50_SYMBOLS
-
-    symbols = NIFTY50_SYMBOLS[:max_symbols] if active_only else NIFTY50_SYMBOLS
-    symbols = [s.replace(".NS", "") for s in symbols]
+    from src.data.universe import get_tradeable_universe
+    all_syms = get_tradeable_universe()
+    symbols = all_syms[:max_symbols] if active_only else all_syms
 
     results = {}
     for i, sym in enumerate(symbols):

@@ -70,13 +70,14 @@ def eod_predictions():
             tier = "SPECULATIVE"
         
         # Estimate expected return from probability
+        prob = item.get("probability", 0.5)
         if direction == "BUY":
-            expected_return_pct = round((item.get("probability", 0.5) - 0.5) * 10, 2)
-            predicted_close = round(last_close * 1.01, 2)
+            expected_return_pct = round((prob - 0.5) * 10, 2)
+            predicted_close = round(last_close * (1 + expected_return_pct/100), 2)
             signal = "BUY"
         elif direction == "SELL":
-            expected_return_pct = round((0.5 - item.get("probability", 0.5)) * 10, 2)
-            predicted_close = round(last_close * 0.99, 2)
+            expected_return_pct = round((prob - 0.5) * 10, 2)
+            predicted_close = round(last_close * (1 + expected_return_pct/100), 2)
             signal = "SELL"
         else:
             expected_return_pct = 0

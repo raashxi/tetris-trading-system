@@ -64,6 +64,7 @@ services:
     volumes:
       - ./src:/app/src
       - ./logs:/app/logs
+      - ./models:/app/models
       - ./frontend:/app/frontend
     command: uvicorn src.api.server:app --host 0.0.0.0 --port 8502
     restart: unless-stopped

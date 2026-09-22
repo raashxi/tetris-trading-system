@@ -1,48 +1,71 @@
 #!/bin/bash
-echo "╔══════════════════════════════════════╗"
-echo "║   ⚡ TETRIS — Morning Startup        ║"
-echo "║   $(date '+%Y-%m-%d %H:%M:%S IST')   ║"
-echo "╚══════════════════════════════════════╝"
-
+set -e
 cd ~/trading_bot
 
-if ! docker ps 2>/dev/null | grep -q trading_bot_main; then
-    echo "Starting containers..."
-    docker-compose up -d --no-build
-    sleep 15
-else
-    echo "Containers already running"
+LOG_DIR="logs/cron"
+mkdir -p "$LOG_DIR"
+LOG="$LOG_DIR/start_$(date +%Y-%m-%d).log"
+
+log() { echo "[$(date '+%Y-%m-%d %H:%M:%S IST')] $1" | tee -a "$LOG"; }
+
+log "══════════════════════════════════════"
+log "  TETRIS — Morning Startup"
+log "══════════════════════════════════════"
+
+# 1. Kill switch check
+if [ -f "STOP" ]; then
+    log "STOP file found. Aborting startup."
+    exit 1
 fi
 
-docker exec -u root trading_bot_main ln -sf /usr/share/zoneinfo/Asia/Kolkata /etc/localtime 2>/dev/null
+# 2. Docker must be running
+if ! docker ps > /dev/null 2>&1; then
+    log "Docker is not running. Attempting to start Docker Desktop..."
+    open -a Docker
+    sleep 30
+    if ! docker ps > /dev/null 2>&1; then
+        log "Docker failed to start. Aborting."
+        exit 1
+    fi
+fi
+log "Docker is running."
 
-# Check if token is already valid
-echo "Checking Kite session..."
+# 3. Start containers
+log "Starting containers..."
+docker-compose up -d --no-build
+sleep 15
+
+# 4. Fix timezone
+docker exec -u root trading_bot_main ln -sf /usr/share/zoneinfo/Asia/Kolkata /etc/localtime 2>/dev/null || true
+log "Timezone set to IST."
+
+# 5. Check Kite token (semi-auto)
 TOKEN_VALID=$(docker exec trading_bot_main python3 -c "
 from src.auth.session import KiteSessionManager
-mgr = KiteSessionManager()
-token = mgr._get_stored_token()
-print('VALID' if token and mgr._is_token_valid(token) else 'EXPIRED')
-" 2>/dev/null)
+m = KiteSessionManager()
+t = m._get_stored_token()
+print('VALID' if t and m._is_token_valid(t) else 'EXPIRED')
+" 2>/dev/null || echo "EXPIRED")
 
 if [ "$TOKEN_VALID" = "VALID" ]; then
-    echo "✅ Kite session valid — skipping login"
+    log "Kite token valid. Skipping login."
 else
-    echo "🔐 Login required"
+    log "Kite token expired. Starting interactive login..."
     docker exec -it trading_bot_main python /app/refresh_token.py
+    log "Login complete."
 fi
 
-echo "📊 Computing sentiment proxy..."
-docker exec trading_bot_main python -c "
-import sys; sys.path.insert(0, '/app')
-from src.data.options_fetcher import compute_sentiment_from_quotes
-compute_sentiment_from_quotes()
-"
+# 6. Run EOD predictions
+log "Running EOD predictions..."
+docker exec trading_bot_main python /app/src/scripts/run_eod_predictions.py 2>&1 | tee -a "$LOG"
 
-echo "Running EOD predictions..."
-docker exec trading_bot_main python /app/src/scripts/run_eod_predictions.py
-
-echo "Restarting bot..."
+# 7. Restart bot with fresh state
+log "Restarting bot..."
 docker-compose restart bot
+sleep 5
 
-echo "TETRIS is live. Dashboard: http://localhost:8502"
+log "══════════════════════════════════════"
+log "  TETRIS is LIVE"
+log "  Dashboard: http://localhost:8502"
+log "  Monitor:   ./watch_tetris.sh"
+log "══════════════════════════════════════"

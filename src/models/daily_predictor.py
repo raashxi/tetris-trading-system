@@ -10,6 +10,7 @@ from loguru import logger
 
 from src.data.daily_fetcher import fetch_daily
 from src.data.fetcher import NIFTY50_SYMBOLS
+from src.data.extended_symbols import NIFTY_NEXT_50
 from src.features.daily_features import add_daily_features
 from src.features.daily_target import add_target
 from src.models.daily_trainer import DailyTrainer, EOD_MODEL_DIR
@@ -60,7 +61,7 @@ class DailyPredictor:
             return {
                 "symbol": self.symbol,
                 "last_close": last_close,
-                "direction": "BUY" if result["direction"] == 1 else "SELL",
+                "direction": {1: "BUY", 0: "SELL", -1: "HOLD"}.get(result["direction"], "HOLD"),
                 "probability": result["probability"],
                 "confidence": result["confidence"],
                 "win_rate": self.trainer.win_rate,
@@ -71,7 +72,7 @@ class DailyPredictor:
             return None
 
 
-def run_daily_predictions(max_symbols: int = 50) -> Dict[str, Dict]:
+def run_daily_predictions(max_symbols: int = 100) -> Dict[str, Dict]:
     """
     Run EOD predictions for all trained symbols.
     Call this at 9:00 AM from main.py or scheduler.
@@ -79,7 +80,8 @@ def run_daily_predictions(max_symbols: int = 50) -> Dict[str, Dict]:
     Returns:
         Dict mapping symbol to prediction dict
     """
-    symbols = [s.replace(".NS", "") for s in NIFTY50_SYMBOLS[:max_symbols]]
+    from src.data.universe import get_tradeable_universe
+    symbols = get_tradeable_universe()[:max_symbols]
     # Only predict for symbols that have trained models
     trained = set(
         p.stem.split("_")[0]

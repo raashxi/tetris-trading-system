@@ -4,29 +4,32 @@ capital‑aware pacing, and full lifecycle integration.
 """
 from __future__ import annotations
 
-import sys, os, time, signal
-from datetime import datetime, timedelta, time
+import os
+import signal
+import sys
+import time
+from datetime import datetime, timedelta, time as dtime
 from pathlib import Path
-from typing import Dict, Optional, Tuple, List
+from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 import pandas as pd
 import yaml
-
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-
 from loguru import logger
+
+# Make `src` importable regardless of CWD (needed inside Docker)
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from src.data.calendar import is_market_open, MarketStatus, minutes_to_close
 from src.data.fetcher import fetch_historical, fetch_live_quote, NIFTY50_SYMBOLS
 from src.features.technical import add_all_features
-from src.trading.risk import RiskManager
-from src.trading.strategy import Strategy
-from src.trading.execution import PaperBroker, LiveZerodhaBroker
-from src.trading.order_manager import OrderManager
-from src.trading.cost_model import minimum_move_for_profit
 from src.models.predictor import Predictor
 from src.monitoring.alerter import Alerter
+from src.trading.cost_model import minimum_move_for_profit
+from src.trading.execution import PaperBroker, LiveZerodhaBroker
+from src.trading.order_manager import OrderManager
+from src.trading.risk import RiskManager
+from src.trading.strategy import Strategy
 
 # ---------------------------------------------------------------------------
 # CONSTANTS
@@ -205,9 +208,8 @@ class TradingSystem:
             for m in MODEL_DIR.glob("*.pkl")
             if m.suffix == ".pkl"
         )
-        all_syms = [s.replace(".NS", "") for s in NIFTY50_SYMBOLS]
-        self.active_symbols = [s for s in all_syms if s in trained]
-        logger.info(f"Trading {len(self.active_symbols)} stocks")
+        self.active_symbols = sorted(trained)
+        logger.info(f"Trading {len(self.active_symbols)} stocks with intraday models")
 
 
 system = TradingSystem()
@@ -271,27 +273,6 @@ def pre_filter_signal(symbol: str, ltp: float, predicted_return: float,
         profit_buffer_pct=0.5,
     )
     expected_move_abs = abs(predicted_return) * confidence * ltp
-    if expected_move_abs < required_move:
-        return False, required_move
-    return True, required_move
-
-    # Estimate stop‑loss distance (2 * ATR)
-    approx_stop = ltp - 2 * atr if predicted_return > 0 else ltp + 2 * atr
-    # Realistic quantity
-    qty = compute_position_size(ltp, approx_stop, atr, spread_pct)
-    if qty == 0:
-        return False, 0.0
-
-    # Use dynamic cost model
-    required_move = minimum_move_for_profit(
-        symbol, qty, ltp,
-        atr=atr,
-        spread_pct=spread_pct / 100.0,
-        avg_daily_volume=avg_daily_volume,
-        profit_buffer_pct=0.5,
-    )
-    effective_confidence = max(confidence, 0.3)  # floor at 0.3
-    expected_move_abs = abs(predicted_return) * effective_confidence * ltp
     if expected_move_abs < required_move:
         return False, required_move
     return True, required_move
@@ -600,7 +581,7 @@ def run_cycle():
         pass
 
      # ── Momentum strategy (once per day, after 9:20 AM) ──
-    if system.cycle_count == 1 and datetime.now().time() >= time(9, 20):
+    if system.cycle_count == 1 and datetime.now().time() >= dtime(9, 20):
         try:
             from src.strategies.momentum_strategy import MomentumStrategy
             mom = MomentumStrategy()

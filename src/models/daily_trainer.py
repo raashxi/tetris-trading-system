@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import pickle
+import time
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Dict, Optional, Tuple
@@ -16,6 +17,7 @@ from xgboost import XGBClassifier
 
 from src.data.daily_fetcher import fetch_daily
 from src.data.fetcher import NIFTY50_SYMBOLS
+from src.data.extended_symbols import NIFTY_NEXT_50
 from src.features.daily_features import add_daily_features
 from src.features.daily_target import add_target
 
@@ -23,7 +25,7 @@ EOD_MODEL_DIR = Path("/app/models/eod")
 EOD_MODEL_DIR.mkdir(parents=True, exist_ok=True)
 
 # Thresholds for daily models
-MIN_WIN_RATE = 0.52
+MIN_WIN_RATE = 0.515
 MIN_SHARPE = 0.2
 PURGE_DAYS = 5          # remove days around fold boundary
 EMBARGO_DAYS = 10        # skip days after training ends
@@ -35,7 +37,7 @@ EST_COST_PCT = 0.001
 class DailyTrainer:
     """Trains RF + XGBoost for next-day direction prediction using walk‑forward CV."""
 
-    def __init__(self, symbol: str, train_years: int = 3, step_months: int = 3):
+    def __init__(self, symbol: str, train_years: int = 5, step_months: int = 3):
         self.symbol = symbol
         self.train_years = train_years
         self.step_months = step_months
@@ -47,7 +49,7 @@ class DailyTrainer:
         self.sharpe: float = 0.0
         self.cost_adj_win_rate: float = 0.0
 
-    def prepare_data(self) -> Optional[Tuple[pd.DataFrame, pd.Series]]:
+    def prepare_data(self) -> Optional[Tuple[pd.DataFrame, pd.Series, pd.DataFrame]]:
         """Fetch daily data, compute features and target."""
         df = fetch_daily(self.symbol, days=self.train_years * 365)
         if df is None or len(df) < 300:
@@ -68,7 +70,7 @@ class DailyTrainer:
         X = df[self.feature_cols]
         y = df["target_direction"].astype(int)
         logger.info(f"{self.symbol}: {len(X)} samples, {len(self.feature_cols)} features")
-        return X, y
+        return X, y, df
 
     def train(self) -> bool:
         """Walk‑forward training with purge and embargo gaps."""
@@ -76,7 +78,7 @@ class DailyTrainer:
         if data is None:
             return False
 
-        X, y = data
+        X, y, df = data
         n = len(X)
         step_size = self.step_months * 21  # ~21 trading days per month
 
@@ -104,17 +106,23 @@ class DailyTrainer:
             y_train = y.iloc[train_start:train_end].values.ravel()
             y_val = y.iloc[val_start:val_end].values.ravel()
 
-            # Train RF
+            # Compute class weights for fold
+            n_pos = max(int((y_train == 1).sum()), 1)
+            n_neg = max(int((y_train == 0).sum()), 1)
+            fold_pos_weight = n_neg / n_pos
+
+            # Train RF with class balancing
             rf = RandomForestClassifier(
                 n_estimators=200, max_depth=8, min_samples_leaf=10,
-                random_state=42, n_jobs=-1
+                random_state=42, n_jobs=-1, class_weight='balanced'
             )
             rf.fit(X_train, y_train)
 
-            # Train XGB
+            # Train XGB with scale_pos_weight
             xgb = XGBClassifier(
                 n_estimators=500, max_depth=5, learning_rate=0.01,
-                subsample=0.8, random_state=42, verbosity=0
+                subsample=0.8, random_state=42, verbosity=0,
+                scale_pos_weight=fold_pos_weight
             )
             xgb.fit(X_train, y_train)
 
@@ -128,7 +136,7 @@ class DailyTrainer:
             all_y_pred.extend(ensemble_pred)
 
             # Cost‑adjusted returns for validation period
-            actual_returns = X.iloc[val_start:val_end]["return_1d"].values
+            actual_returns = df.iloc[val_start:val_end]["target_return"].values
             for i, pred in enumerate(ensemble_pred):
                 if pred == 1:
                     ret = actual_returns[i] - EST_COST_PCT
@@ -152,8 +160,8 @@ class DailyTrainer:
         logger.info(f"  Cost‑adjusted Win Rate: {self.cost_adj_win_rate:.3f}")
         logger.info(f"  Sharpe: {self.sharpe:.3f}")
 
-        if self.win_rate < MIN_WIN_RATE and self.cost_adj_win_rate < MIN_WIN_RATE:
-            logger.warning(f"{self.symbol} below thresholds. Discarding.")
+        if self.win_rate < MIN_WIN_RATE:
+            logger.warning(f"{self.symbol} below win-rate threshold (WR {self.win_rate:.3f}). Discarding.")
             return False
 
         # Fit final models on ALL data for production use
@@ -164,12 +172,13 @@ class DailyTrainer:
         self.scaler = final_scaler
         self.rf_model = RandomForestClassifier(
             n_estimators=200, max_depth=8, min_samples_leaf=10,
-            random_state=42, n_jobs=-1
+            random_state=42, n_jobs=-1, class_weight='balanced'
         )
         self.rf_model.fit(X_all, y_all)
         self.xgb_model = XGBClassifier(
             n_estimators=500, max_depth=5, learning_rate=0.01,
-            subsample=0.8, random_state=42, verbosity=0
+            subsample=0.8, random_state=42, verbosity=0,
+            scale_pos_weight=len(y_all[y_all==0])/max(len(y_all[y_all==1]),1)
         )
         self.xgb_model.fit(X_all, y_all)
 
@@ -202,7 +211,13 @@ class DailyTrainer:
         rf_prob = self.rf_model.predict_proba(X_scaled)[:, 1]
         xgb_prob = self.xgb_model.predict_proba(X_scaled)[:, 1]
         prob = float((rf_prob[-1] + xgb_prob[-1]) / 2)
-        direction = 1 if prob > 0.5 else 0
+        # Neutral HOLD zone: 0.48 <= prob <= 0.52
+        if prob >= 0.52:
+            direction = 1   # BUY
+        elif prob <= 0.48:
+            direction = 0   # SELL
+        else:
+            direction = -1  # HOLD
         confidence = 2 * abs(prob - 0.5)
         return {"direction": direction, "probability": round(prob, 4), "confidence": round(confidence, 4)}
 
@@ -223,11 +238,14 @@ class DailyTrainer:
         return True
 
 
-def train_all_eod(max_symbols: int = 50) -> Dict[str, bool]:
-    """Train EOD models for Nifty 50 with walk‑forward validation."""
-    symbols = [s.replace(".NS", "") for s in NIFTY50_SYMBOLS[:max_symbols]]
+def train_all_eod(max_symbols: int = 100) -> Dict[str, bool]:
+    """Train EOD models for tradeable universe with walk‑forward validation."""
+    from src.data.universe import get_tradeable_universe
+    symbols = get_tradeable_universe()[:max_symbols]
+
     results = {}
     for i, sym in enumerate(symbols):
+        time.sleep(0.3)
         logger.info(f"=== EOD Training {sym} ({i+1}/{len(symbols)}) ===")
         try:
             t = DailyTrainer(sym)

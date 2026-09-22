@@ -6,6 +6,7 @@ RUN apt-get update && apt-get install -y curl git tzdata && rm -rf /var/lib/apt/
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PIP_NO_CACHE_DIR=1
 
 WORKDIR /app
+ENV PYTHONPATH=/app
 
 COPY requirements.txt .
 

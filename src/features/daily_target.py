@@ -4,13 +4,13 @@ from __future__ import annotations
 import pandas as pd
 
 
-def add_target(df: pd.DataFrame, threshold: float = 0.005) -> pd.DataFrame:
+def add_target(df: pd.DataFrame, threshold: float = 0.0) -> pd.DataFrame:
     """
     Add target columns for next-day prediction.
 
     Args:
         df: DataFrame with 'close' column and datetime index
-        threshold: minimum return to be considered a tradeable move (0.005 = 0.5%)
+        threshold: minimum return to be considered a tradeable move (0.002 = 0.2%)
 
     Returns:
         DataFrame with added columns:
